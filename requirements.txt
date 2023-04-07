@@ -1,0 +1,6 @@
+numpy
+pandas
+ipykernel
+openai
+tqdm
+langchain
