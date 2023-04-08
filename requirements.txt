@@ -4,3 +4,4 @@ ipykernel
 openai
 tqdm
 langchain
+PyYAML

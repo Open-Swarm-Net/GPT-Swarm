@@ -58,6 +58,7 @@ class Swarm:
             "problem": self.problem,
             "scores": [],
             "answers": [],
+            "evaluations": [],
             "best_score": 0,
             "best_answer": "",
         }
@@ -105,6 +106,12 @@ class Swarm:
         neighbours = self.agents[distances <= 1]
         return neighbours
     
+    def get_value_tensor(self):
+        value_tensor = np.zeros(self.tensor_shape)
+        for agent, agent_coords in zip(self.agents, self.agents_coords):
+            value_tensor[tuple(agent_coords)] = agent.result_score
+        return value_tensor
+    
     def run_swarm(self, max_cycles=10):
         """Runs the swarm for a given number of cycles or until the termination condition is met.
         """
@@ -118,8 +125,12 @@ class Swarm:
         TODO parallelize the computation of the agents
         """
         for agent in self.agents:
-            agent.perform_task(self.cycle_state["cycle_type"])
-        self.history.append(self.cycle_state | self.shared_memory)
+            try:
+                agent.perform_task(self.cycle_state["cycle_type"])
+            except Exception as e:
+                print(f"Agent {agent.uuid} failed to perform task {self.cycle_state['cycle_type']}")
+        self.cycle_state["value_tensor"] = self.get_value_tensor()
+        self.history.append(self.cycle_state.copy() | self.shared_memory.copy())
         
         next_cycle_type = self._get_next_cycle_type()
         self.cycle_state["cycle"] += 1
@@ -130,15 +141,16 @@ class Swarm:
 
     def termination_condition(self):
         # Define your termination condition based on the problem or swarm state
-        if self.shared_memory["best_score"] > 0.9:
+        if self.shared_memory["best_score"] > 1:
             print("Termination condition met!")
             return True
         else:
             return False
         
-    def add_to_shared_memory(self, score, result):
+    def add_to_shared_memory(self, score, result, evaluation):
         self.shared_memory["scores"].append(score)
         self.shared_memory["answers"].append(result)
+        self.shared_memory["evaluations"].append(evaluation)
 
         if score > self.shared_memory["best_score"]:
             self.shared_memory["best_score"] = score
