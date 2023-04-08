@@ -1,5 +1,6 @@
 # config.yaml
 problem_id: 1
+leetccode_link: https://leetcode.com/problems/global-and-local-inversions/description/
 problem_name: "Global and Local Inversions"
 problem_statement_file: "challenge1_statement.txt"
 solution_file: "challenge1_solution.py"

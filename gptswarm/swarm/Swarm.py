@@ -1,7 +1,7 @@
 import numpy as np
 import uuid
 
-from gptswarm.swarm.Worker import TestWorker
+from gptswarm.swarm.Workers.TestWorker import TestWorker
 
 class Swarm:
     """This class is responsible for managing the swarm of agents.
@@ -34,17 +34,15 @@ class Swarm:
 
     CYCLES = ["compute", "share"]
 
-    def __init__(self, problem, reward_function, tensor_shape, agent_role_distribution):
+    def __init__(self, challenge, tensor_shape, agent_role_distribution):
         """Initializes the swarm.
 
         Args:
-            problem (str): The problem to solve.
-            reward_function (function): The reward function.
+            challenge (implementation of ChallengeBase): The problem to solve.
             tensor_shape (tuple): The shape of the tensor that defines the connectivity between agents.
             agent_role_distribution (dict): The weight of each role in the swarm.
         """
-        self.problem = problem
-        self.reward_function = reward_function
+        self.challenge = challenge
         self.tensor_shape = tensor_shape
         self.agent_role_distribution = agent_role_distribution
 
@@ -55,7 +53,7 @@ class Swarm:
 
         # creating the shared memory, for now just a stupid lsit of scores and answers
         self.shared_memory = {
-            "problem": self.problem,
+            "problem": self.challenge.get_problem(),
             "scores": [],
             "answers": [],
             "evaluations": [],
@@ -85,7 +83,7 @@ class Swarm:
         agents = []
         for agent_role in agent_roles_n:
             worker_uuid = uuid.uuid4()
-            agents.append(self.WORKER_ROLES[agent_role](worker_uuid, self, self.problem))
+            agents.append(self.WORKER_ROLES[agent_role](worker_uuid, self, self.challenge))
             self.agents_uuids.append(worker_uuid)
 
         np.random.shuffle(agents)
@@ -141,7 +139,7 @@ class Swarm:
 
     def termination_condition(self):
         # Define your termination condition based on the problem or swarm state
-        if self.shared_memory["best_score"] > 1:
+        if self.shared_memory["best_score"] > 0.99:
             print("Termination condition met!")
             return True
         else:

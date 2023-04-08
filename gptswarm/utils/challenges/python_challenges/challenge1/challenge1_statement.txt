@@ -8,6 +8,7 @@ The number of local inversions is the number of indices i where:
 0 <= i < n - 1
 nums[i] > nums[i + 1]
 Return true if the number of global inversions is equal to the number of local inversions.
+Achieve it in O(n) complexity, (hint: avoid the nested loops).
 
 Example 1:
 Input: nums = [1,0,2]
@@ -28,10 +29,10 @@ nums is a permutation of all the numbers in the range [0, n - 1].
 
 Function to implement:
 ```python
-def isIdealPermutation(self, A: list) -> bool:
+def isIdealPermutation(A: list) -> bool:
     """
     Args:
-        - A (List[int]): a list of integers.
+        - A (list[int]): a list of integers.
     
     Returns:
         bool: true if the number of global inversions is equal to the number of local inversions

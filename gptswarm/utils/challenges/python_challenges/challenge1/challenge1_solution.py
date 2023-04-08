@@ -4,7 +4,7 @@ import random
 from gptswarm.utils.challenges.PythonChallenge import PythonChallengeSolutionBase
 
 class Solution(PythonChallengeSolutionBase):
-    def isIdealPermutation(self, A: List[int]) -> bool:
+    def _isIdealPermutation(self, A: List[int]) -> bool:
         for i in range(len(A)):
             if i - A[i] > 1 or i - A[i] < -1: return False
         return True
@@ -13,26 +13,27 @@ class Solution(PythonChallengeSolutionBase):
         """Generates and integer integer array nums of length n which represents a permutation of all the integers in the range [0, n - 1].
         is an ideal permuation if the number of global inversions is equal to the number of local inversions.
         """
-        prob_of_ideal = 0.5
-        if random.random() < prob_of_ideal:
-            n = random.randint(1, 10)
-            nums = list(range(n))
-            random.shuffle(nums)
+        equal_inversions = random.choice([True, False])
+        n = random.randint(2, 100)
+        nums = list(range(n))
+        
+        if equal_inversions:
+            for i in range(n - 1):
+                if nums[i] > nums[i + 1]:
+                    nums[i], nums[i + 1] = nums[i + 1], nums[i]
         else:
-            n = random.randint(1, 10)
-            nums = list(range(n))
-            random.shuffle(nums)
-            i = random.randint(0, n-1)
-            j = random.randint(0, n-1)
+            i = random.randint(0, n - 2)
+            j = random.randint(i + 1, n - 1)
             nums[i], nums[j] = nums[j], nums[i]
-        return {"A": nums}
+
+        return nums
         
     def test_solution(self, test_func):
         test_input = self.gen_random_input()
-        correct_result = self.isIdealPermutation(**test_input)
+        correct_result = self._isIdealPermutation(A=test_input.copy())
 
         try:
-            result = test_func(**test_input)
+            result = test_func(A=test_input.copy())
         except Exception as e:
             return 0, f"{e}"
         

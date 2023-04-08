@@ -4,7 +4,7 @@ import sys
 import types
 import importlib.util
 import re
-from typing import Tuple
+import random
 from pathlib import Path
 
 from gptswarm.utils.challenges.ChallengeBase import ChallengeBase
@@ -29,6 +29,7 @@ class PythonChallengeSolutionBase(ABC):
     def evaluate_solution(self, solution_func, n_tests=10):
         """Putting the shared testing loging in the base class
         """
+        max_evaluations = 10
         evaluations = []
         passed_tests = 0
 
@@ -38,6 +39,8 @@ class PythonChallengeSolutionBase(ABC):
                 evaluations.append(output)
             passed_tests += score
 
+        if len(evaluations) >= max_evaluations:
+            evaluations = random.sample(evaluations, max_evaluations) # not the best way. should prefer the ones with the lowest score
         evaluations = "\n".join(evaluations)
 
         return passed_tests / n_tests, evaluations
