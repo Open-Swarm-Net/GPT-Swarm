@@ -2,11 +2,11 @@ import sys
 import os
 import openai
 
-from gptswarm.utils.LLMCaller import LLMCaller
+from gptswarm.utils.LLMAgentBase import LLMAgentBase
 
-class GPTCaller(LLMCaller):
+class GPTAgent(LLMAgentBase):
     """This class is responsible for interacting with the openai API.
-    model_parameters = {"model_name": name}
+    agent_parameters = {"model_name": name}
 
     Potential names: https://platform.openai.com/docs/models/overview
     """
@@ -15,16 +15,29 @@ class GPTCaller(LLMCaller):
         "gpt-3.5-turbo", "gpt-3.5-turbo-0301",
         ]
 
-    def __init__(self, model_parameters):
-        super().__init__(model_parameters)
+    def __init__(self, agent_parameters):
+        """
+        agent_parameters = {
+            "chat": True,
+            "model_name": "openai/gpt-3.5-turbo",
+            "model_params": {
+                "model_name": "gpt-3.5-turbo",
+                "temperature": 0.5,
+                "max_tokens": 400
+                },
+            "agent": "zero-shot-react-description",
+            }
+        """
+        super().__init__(agent_parameters)
         
         # check if configuration is valid
-        if "model_name" not in model_parameters:
+        if "model_name" not in agent_parameters["model_params"]:
             raise Exception("model_name is not in model_parameters")
         if "OPENAI_API_KEY" not in os.environ:
             raise Exception("OPENAI_API_KEY is not in os.environ")
 
-        self.model_name = model_parameters["model_name"]
+        self.model_name = agent_parameters["model_params"]["model_name"]
+        self.call_params = agent_parameters["model_params"]
         openai.api_key = os.getenv("OPENAI_API_KEY")
 
         ## check is openai api key is set and openai api is working
@@ -35,7 +48,7 @@ class GPTCaller(LLMCaller):
             print(f"Error: {e}")
             sys.exit(1)
     
-    def call_model(self, conversation, call_parameters):
+    def call_model(self, conversation):
         """Calls the LLM with the given conversation and input format.
 
         Args:
@@ -44,10 +57,8 @@ class GPTCaller(LLMCaller):
                     {"role": "system", "content": configuration_prompt},
                     {"role": "user", "content": prompt}
                 ]
-
-            call_parameters (dict): The parameters for the call specific for each provider. Example:
-                {"max_tokens": 100, "temperature": 0.5, "n": 1, "stop": None}
         """
+        call_parameters = self.call_params.copy()
         # convert conversation to openai format
         conversation, call_parameters = self._convert_to_correct_format(conversation, call_parameters)
 
@@ -64,7 +75,7 @@ class GPTCaller(LLMCaller):
             conversation = self._convert_to_string(conversation)
             return conversation, call_parameters
 
-    def gen_request_to_api(self, messages, max_tokens=100, temperature=0.5, n=1, stop=None):
+    def gen_request_to_api(self, messages, model_name="gpt-3.5-turbo", max_tokens=100, temperature=0.5, n=1, stop=None):
         if self.model_name in self.CONVERSTATIONAL_MODELS:
             response = openai.ChatCompletion.create(model=self.model_name, messages=messages, max_tokens=max_tokens, temperature=temperature, n=n, stop=stop)
             return response["choices"][0]["message"]["content"]

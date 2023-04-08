@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-class LLMCaller:
+class LLMAgentBase:
     """Abstract class that defines the interface for the models caller.
     Has methods to call the models for example though the api.
     As input it can take models parameters like temperature, as well as the conversation list in the openAI style.
@@ -8,14 +8,25 @@ class LLMCaller:
 
     I did it in an abstract way, in case we want to add more models in the future.
     """
-    def __init__(self, model_parameters=None):
+    def __init__(self, agent_parameters=None):
         """Models parameters defines the configuration of the model.
-        Example: {"model_name": "gpt-3.5-turbo"}
+        Example: 
+        agent_parameters = {
+            "chat": True,
+            "model_name": "langchain/gpt-3.5-turbo",
+            "tools": ['serpapi', 'wolfram-alpha'],
+            "model_params": {
+                "model_name": "gpt-3.5-turbo",
+                "temperature": 0.5,
+                "max_tokens": 400
+                },
+            "agent": "zero-shot-react-description",
+            }
         """
-        self.model_parameters = model_parameters if model_parameters else {}
+        self.model_parameters = agent_parameters if agent_parameters else {}
 
     @abstractmethod
-    def call_model(self, conversation, call_parameters):
+    def call_model(self, conversation):
         """
         Calls the LLM with the given conversation and input format.
 
@@ -25,9 +36,6 @@ class LLMCaller:
                     {"role": "system", "content": configuration_prompt},
                     {"role": "user", "content": prompt}
                 ]
-
-            call_parameters (dict): The parameters for the call specific for each provider. Example:
-                {"max_tokens": 100, "temperature": 0.5, "n": 1, "stop": None}
         """
         pass
 

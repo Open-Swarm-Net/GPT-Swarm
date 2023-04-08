@@ -4,7 +4,7 @@ import json
 sys.path.append('..')
 
 from pathlib import Path
-from gptswarm.utils.GPTCaller import GPTCaller
+from gptswarm.utils.GPTAgent import GPTAgent
 
 class bcolors:
     HEADER = '\033[95m'
@@ -23,7 +23,18 @@ def test_openai_integration(model_name):
         keys = json.load(f)
     os.environ["OPENAI_API_KEY"] = keys["OPENAI_API_KEY"]
 
-    caller = GPTCaller({"model_name": model_name})
+    agent_parameters = {
+        "model_name": f"openai/{model_name}",
+        "tools": [],
+        "model_params" : {
+            "model_name": model_name,
+            "temperature": 0.5,
+            "max_tokens": 400
+            },
+        "agent": "zero-shot-react-description",
+        }
+    
+    caller = GPTAgent(agent_parameters)
     conversation = [
         {"role": "system", "content": "act as a professional writer and expert in poems as well as AI and swarm intelligence."},
         {"role": "user", "content": "Write a cheerful poem under 100 words about how swarm intelligence is superior to single-model AI."}
@@ -36,7 +47,7 @@ def test_openai_integration(model_name):
     }
 
     # call the model
-    response = caller.call_model(conversation, call_parameters)
+    response = caller.call_model(conversation)
     
     print(f"{bcolors.OKBLUE}TASK{bcolors.ENDC} => {conversation[1]['content']}")
     print(f"{bcolors.OKBLUE}RESPONSE{bcolors.ENDC} => \n {response}")
