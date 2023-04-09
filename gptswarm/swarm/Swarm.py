@@ -1,5 +1,12 @@
 import numpy as np
 import uuid
+import copy
+from tqdm import tqdm
+from pathlib import Path
+import traceback
+import concurrent.futures
+
+import logging
 
 from gptswarm.swarm.Workers.TestWorker import TestWorker
 
@@ -26,6 +33,7 @@ class Swarm:
 
     TODO:
         - adaptation algorithm
+        - vector database for the shared memory
     """
 
     WORKER_ROLES = {
@@ -52,6 +60,8 @@ class Swarm:
         self.agents_coords = self._create_connectivity_matrix() # returns a matrix of agent coordinates
 
         # creating the shared memory, for now just a stupid lsit of scores and answers
+        # TODO: make it a class for a potential vector database implementation
+        self.max_memory_size = 20
         self.shared_memory = {
             "problem": self.challenge.get_problem(),
             "scores": [],
@@ -67,6 +77,7 @@ class Swarm:
             "cycle_type": "compute"
         }
         self.history = []
+        self.logger = None
         
 
     def _create_agents(self):
@@ -114,21 +125,30 @@ class Swarm:
         """Runs the swarm for a given number of cycles or until the termination condition is met.
         """
         while self.cycle_state["cycle"] < max_cycles and not self.termination_condition():
-            print(f"Cycle {self.cycle_state['cycle']}")
+            self.log(f"Cycle {self.cycle_state['cycle']}")
+            self.log(f"Shered memory: {self.shared_memory}")
             self.iterate_cycle()
+
+    def _try_compute_agent(self, agent):
+        try:
+            agent.perform_task(self.cycle_state["cycle_type"])
+        except Exception as e:
+            self.log(f"Agent {agent.worker_uuid} failed to perform task {self.cycle_state['cycle_type']}")
+            # print e and also the full traceback
+            traceback.print_exc()
+            self.log(e)
+            agent.evaluation = e
+            agent.result_score = 0
 
     def iterate_cycle(self):
         """Iterates the swarm through the computational cycles.
-
-        TODO parallelize the computation of the agents
+        TODO: parallelize the computation of the agents
         """
         for agent in self.agents:
-            try:
-                agent.perform_task(self.cycle_state["cycle_type"])
-            except Exception as e:
-                print(f"Agent {agent.uuid} failed to perform task {self.cycle_state['cycle_type']}")
+            self._try_compute_agent(agent)
+
         self.cycle_state["value_tensor"] = self.get_value_tensor()
-        self.history.append(self.cycle_state.copy() | self.shared_memory.copy())
+        self.history.append(copy.deepcopy(self.cycle_state) | copy.deepcopy(self.shared_memory.copy()))
         
         next_cycle_type = self._get_next_cycle_type()
         self.cycle_state["cycle"] += 1
@@ -140,7 +160,7 @@ class Swarm:
     def termination_condition(self):
         # Define your termination condition based on the problem or swarm state
         if self.shared_memory["best_score"] > 0.99:
-            print("Termination condition met!")
+            self.log("Termination condition met!")
             return True
         else:
             return False
@@ -153,3 +173,53 @@ class Swarm:
         if score > self.shared_memory["best_score"]:
             self.shared_memory["best_score"] = score
             self.shared_memory["best_answer"] = result
+
+        # leave the top best results in the memory
+        if len(self.shared_memory["scores"]) > self.max_memory_size:
+            len_val = len(self.shared_memory["scores"])
+            n_best = np.argsort(self.shared_memory["scores"])[-self.max_memory_size:]
+
+            self.shared_memory["scores"] = [self.shared_memory["scores"][i] for i in n_best]
+            self.shared_memory["answers"] = [self.shared_memory["answers"][i] for i in n_best]
+
+    def log(self, message, level="info"):
+        """Logs a message to the swarm log.
+        Creates a logger if it doesn't exist yet.
+
+        Logs the data to the log file.
+        """
+        self.log_file = Path("log.txt")
+        if not self.log_file.parent.exists():
+            self.log_file.parent.mkdir()
+        if not self.log_file.exists():
+            self.log_file.touch()
+
+        if self.logger is None :
+            self.logger = logging.getLogger("swarm")
+            self.logger.setLevel(logging.DEBUG)
+            fh = logging.FileHandler(self.log_file)
+            fh.setLevel(logging.DEBUG)
+            ch = logging.StreamHandler()
+            ch.setLevel(logging.DEBUG)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            fh.setFormatter(formatter)
+            ch.setFormatter(formatter)
+            self.logger.addHandler(fh)
+            self.logger.addHandler(ch)
+
+        if level == "info":
+            self.logger.info(message)
+        elif level == "debug":
+            self.logger.debug(message)
+        elif level == "warning":
+            self.logger.warning(message)
+        elif level == "error":
+            self.logger.error(message)
+        elif level == "critical":
+            self.logger.critical(message)
+
+
+
+
+
+                

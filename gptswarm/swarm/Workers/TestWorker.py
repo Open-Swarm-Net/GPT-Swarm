@@ -1,4 +1,5 @@
 from gptswarm.swarm.Workers.WorkerBase import WorkerBase
+import numpy as np
 
 class TestWorker(WorkerBase):
     """This class is implementing a test worker.
@@ -13,34 +14,37 @@ class TestWorker(WorkerBase):
             challenge (Implementation of ChallengeBase): a challenge that the worker will solve, has methods get_problem and evaluate_solution
         """
         model_name = "gpt-3.5-turbo"
-        default_agent_parameters = {
+        self.default_agent_parameters = {
             "model_name": f"openai/{model_name}",
             "model_params" : {
                 "model_name": model_name,
                 "temperature": 0.5,
-                "max_tokens": 500
+                "max_tokens": 1500
                 }
             }
         super().__init__(worker_uuid, swarm, challenge)
 
         # implementing additional stuff
-        self.agent = self.AGENT_TYPES["gpt"](default_agent_parameters)
+        self.agent = self.AGENT_TYPES["gpt"](self.default_agent_parameters)
 
     def perform_task(self, cycle_type):
         """Performs a task for the given cycle type.
         """
-        print(f"Worker {self.worker_uuid} is performing a task for the {cycle_type} cycle.")
         if cycle_type == "compute":
             self.config_prompt_compute = ""
 
             if len(self.incoming_messages) > 0:
                 additional_info =(
                     f"Other workers before you have provided the following solutions to the global task and their work was tested."
-                    "Incorpoprate the learnings if needed and improve the score. \n\n"
+                    "Incorpoprate the learnings if needed and improve the score. Identify mistakes and find the ways to improve the solutions step by step\n\n"
                 )
                 additional_info += "\n\n".join(self.incoming_messages)
 
                 self.config_prompt_compute += f"\n\n{additional_info}"
+                self.config_prompt_compute = self.truncate_message(self.config_prompt_compute, 4097-self.default_agent_parameters["model_params"]["max_tokens"])
+
+            self.log(f"Worker {self.worker_uuid} is performing a task for the {cycle_type} cycle.")
+            self.log(f"Worker {self.worker_uuid} is using the following config prompt: {self.config_prompt_compute}", level="debug")
 
             self.conversation = [{"role": "system", "content": self.config_prompt_compute}, {"role": "user", "content": self.global_task}]
 
@@ -57,13 +61,14 @@ class TestWorker(WorkerBase):
         """Puts the results of the computation into the incoming_messages container of the neighbours.
         Shares both the result and the evaluation.
         """
-        print(f"Worker {self.worker_uuid} is sharing the results of the computation.")
-
         # there can be a change of location in the swarm
         self.neighbours = self.swarm.get_neighbours(self.worker_uuid)
+        
+        # prepend self to the self.neighbours, which is an np array
+        self.neighbours = np.append(np.array([self]), self.neighbours)
 
         for neighbour in self.neighbours:
-            neighbour.add_message(self.result, self.evaluation)
+            neighbour.add_message(self.result_score, self.result, self.evaluation)
 
         self.swarm.add_to_shared_memory(self.result_score, self.result, self.evaluation)
 
@@ -91,5 +96,6 @@ class TestWorker(WorkerBase):
         #     score = 0
 
         score, evaluation = self.challenge.evaluate_solution(self.result["content"], num_test_cases=100)
+        self.log(f"Worker {self.worker_uuid} evaluated the result as {score}. Evaluation: {evaluation}.")
 
         return score, evaluation

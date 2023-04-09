@@ -5,3 +5,5 @@ openai
 tqdm
 langchain
 PyYAML
+matplotlib
+seaborn

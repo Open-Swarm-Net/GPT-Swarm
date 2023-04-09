@@ -1,0 +1,10 @@
+# config.yaml
+problem_id: 1
+leetccode_link: https://leetcode.com/problems/strong-password-checker/
+problem_name: "420. Strong Password Checker"
+problem_statement_file: "pc2_statement.txt"
+solution_file: "pc2_solution.py"
+function_name: "strongPasswordChecker" # this is the name of the function that the LLMs will create, should be in the problem statement
+input_variables:
+  - name: "password"
+    type: "str"

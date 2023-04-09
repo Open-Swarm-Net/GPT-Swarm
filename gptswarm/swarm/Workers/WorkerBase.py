@@ -44,7 +44,7 @@ class WorkerBase:
     def _self_evaluate(self):
         pass
 
-    def add_message(self, result, evaluation):
+    def add_message(self, result_score, result, evaluation):
         """Receives a message from another worker.
         """
         if isinstance(result, dict):
@@ -55,11 +55,35 @@ class WorkerBase:
         message = f"Potential solution: {result} \nEvaluation: {evaluation}"
         
         # add in a circular buffer fashion
-        self.incoming_messages.append(message)
+        if result_score > 0:
+            self.incoming_messages.append(message)
         while len(self.incoming_messages) > self.max_memory_size:
             self.incoming_messages.pop(0)
 
     def log(self, message, level="info"):
         """Logs a message. The swarm handles the logging and verbosity.
         """
-        #self.swarm.log(self.worker_uuid, message, level)
+        self.swarm.log(message, level)
+
+    def truncate_message(self, message, max_tokens):
+        """Truncate a message to a maximum number of tokens.
+        We use a rule of thumb that 1 token is about 4 symbols (https://platform.openai.com/tokenizer)
+
+        Args:
+            message (str):
+            max_tokens (int): 
+
+        Returns:
+            str: truncated message
+        """
+        
+        # count words
+        symbol_count = len(message)
+        conversion_factor = 2.5
+
+        if symbol_count <= max_tokens*conversion_factor:
+            return message
+
+        new_len = int(max_tokens*conversion_factor)
+        self.log(f"Truncating message from {symbol_count} to {new_len} symbols")
+        return message[:new_len]
