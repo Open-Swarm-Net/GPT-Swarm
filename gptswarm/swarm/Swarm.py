@@ -156,28 +156,27 @@ class Swarm:
     def _compute_agent(self, agent):
         try:
             agent.perform_task(self.cycle_state["cycle_type"])
-            return True
         except Exception as e:
             self.log(f"Error while computing agent: {e}", level="error")
-            return False
+            raise e
 
     def iterate_cycle(self):
         """Iterates the swarm through the computational cycles.
         """
         if self.cycle_state["cycle_type"] == "compute":
-            timeout_per_task = 45 # seconds
-            results = []
+            timeout_per_task = 60 # seconds
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 # sometimes the agents get frozen. Don't know why, yet, so implemented the timeout. Otherwise the swarm can get stuck
                 futures = {executor.submit(self._compute_agent, agent): agent for agent in self.agents}
 
                 # As the tasks complete, process the results
-                for future in concurrent.futures.as_completed(futures, timeout=timeout_per_task*len(self.agents)):
+                n_success = 0
+                for future in concurrent.futures.as_completed(futures, timeout=5*60):
+                    n_success += 1
                     agent = futures[future]
                     try:
-                        result = future.result(timeout=timeout_per_task)
-                        results.append(result)
-                        self.log(f"Agent returned {result}", level="debug")
+                        _ = future.result(timeout=timeout_per_task)
+                        self.log(f"Agent {n_success}/{len(self.agents)} succeeded", level="debug")
                     except concurrent.futures.TimeoutError:
                         self.log(f"Agent timed out", level="error")
                     except Exception as e:

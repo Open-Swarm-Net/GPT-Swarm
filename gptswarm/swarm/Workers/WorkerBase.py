@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
+import threading
 
 from gptswarm.utils.GPTAgent import GPTAgent
 from gptswarm.utils.LangchainAgent import LangchainAgent
 
-class WorkerBase(ABC):
+class WorkerBase(ABC, threading.Thread):
     """The worker class is an abstract class for single entity in the swarm that performs different taks.
     Workers can have different roles, but they all need to implement a set of methods that would allow them to work together in a swarm.
+
+    Moreove implements the threading.Thread class to allow the swarm to run in parallel.
     """
     AGENT_TYPES ={
         "gpt": GPTAgent,

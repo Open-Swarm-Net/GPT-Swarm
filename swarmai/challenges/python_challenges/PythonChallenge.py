@@ -7,7 +7,7 @@ import importlib.util
 import re
 from pathlib import Path
 
-from gptswarm.utils.challenges.ChallengeBase import ChallengeBase
+from swarmai.challenges.ChallengeBase import ChallengeBase
 
 class PythonChallengeSolutionBase(ABC):
     """Base class for the solution that every solution must implement
