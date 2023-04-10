@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from gptswarm.utils.GPTAgent import GPTAgent
 from gptswarm.utils.LangchainAgent import LangchainAgent
 
-class WorkerBase:
+class WorkerBase(ABC):
     """The worker class is an abstract class for single entity in the swarm that performs different taks.
     Workers can have different roles, but they all need to implement a set of methods that would allow them to work together in a swarm.
     """
@@ -15,6 +15,7 @@ class WorkerBase:
     def __init__(self, worker_uuid, swarm, challenge):
         self.worker_uuid = worker_uuid
         self.swarm = swarm
+        self.worker_type = "abstract"
 
         # getting the challenge
         self.challenge = challenge
@@ -26,8 +27,7 @@ class WorkerBase:
         # defining containers for the data
         # expected form of the conversation: [{"role": "user", "content": str}, {"role": "assistant", "content": str}, ...]
         self.conversation = []
-        self.incoming_messages = [] # lsit of strings! not dicts! why, though?
-        self.max_memory_size = 4
+        self.incoming_messages = [] # lsit of tuple (result_score, result, evaluation)
         self.result = {"role": "assistant", "content": ""}
         self.result_score = 0
         self.evaluation = ''
@@ -52,22 +52,16 @@ class WorkerBase:
         if isinstance(evaluation, dict):
             evaluation = evaluation["content"]
 
-        message = f"Potential solution: {result} \nEvaluation: {evaluation}"
-        
-        # add in a circular buffer fashion
-        if result_score > 0:
-            self.incoming_messages.append(message)
-        while len(self.incoming_messages) > self.max_memory_size:
-            self.incoming_messages.pop(0)
+        self.incoming_messages.append((result_score, result, evaluation))
 
     def log(self, message, level="info"):
         """Logs a message. The swarm handles the logging and verbosity.
         """
-        self.swarm.log(message, level)
+        self.swarm.log(agent=self.worker_type, message=message, level=level)
 
     def truncate_message(self, message, max_tokens):
         """Truncate a message to a maximum number of tokens.
-        We use a rule of thumb that 1 token is about 4 symbols (https://platform.openai.com/tokenizer)
+        We use a rule of thumb that 1 token is about 3 symbols (https://platform.openai.com/tokenizer)
 
         Args:
             message (str):
@@ -79,11 +73,11 @@ class WorkerBase:
         
         # count words
         symbol_count = len(message)
-        conversion_factor = 2.5
+        conversion_factor = 3
 
         if symbol_count <= max_tokens*conversion_factor:
             return message
 
         new_len = int(max_tokens*conversion_factor)
-        self.log(f"Truncating message from {symbol_count} to {new_len} symbols")
+        self.log(f"Truncating message from {symbol_count} to {new_len} symbols", level="debug")
         return message[:new_len]

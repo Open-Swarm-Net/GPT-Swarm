@@ -18,7 +18,7 @@ class TestWorker(WorkerBase):
             "model_name": f"openai/{model_name}",
             "model_params" : {
                 "model_name": model_name,
-                "temperature": 0.5,
+                "temperature": 0.1,
                 "max_tokens": 1500
                 }
             }
@@ -26,30 +26,25 @@ class TestWorker(WorkerBase):
 
         # implementing additional stuff
         self.agent = self.AGENT_TYPES["gpt"](self.default_agent_parameters)
+        self.worker_type = "test_worker"
 
     def perform_task(self, cycle_type):
         """Performs a task for the given cycle type.
         """
         if cycle_type == "compute":
-            self.config_prompt_compute = ""
+            self.config_prompt_compute = "Act as a professional python developer."
 
-            if len(self.incoming_messages) > 0:
-                additional_info =(
-                    f"Other workers before you have provided the following solutions to the global task and their work was tested."
-                    "Incorpoprate the learnings if needed and improve the score. Identify mistakes and find the ways to improve the solutions step by step\n\n"
-                )
-                additional_info += "\n\n".join(self.incoming_messages)
-
-                self.config_prompt_compute += f"\n\n{additional_info}"
-                self.config_prompt_compute = self.truncate_message(self.config_prompt_compute, 4097-self.default_agent_parameters["model_params"]["max_tokens"])
-
-            self.log(f"Worker {self.worker_uuid} is performing a task for the {cycle_type} cycle.")
-            self.log(f"Worker {self.worker_uuid} is using the following config prompt: {self.config_prompt_compute}", level="debug")
+            incomming_summary = self._summarize_incoming_messages()
+            if incomming_summary:
+                self.config_prompt_compute += incomming_summary
+                self.config_prompt_compute += "Now, try to improve the solution."
 
             self.conversation = [{"role": "system", "content": self.config_prompt_compute}, {"role": "user", "content": self.global_task}]
 
             response = self.agent.call_model(self.conversation)
             self.result = {"role": "assistant", "content": response}
+            
+            self.log(f"Performing a task for the {cycle_type} cycle.\n\n Config prompt: {self.config_prompt_compute}. \n\n Result: {self.result}", level="debug")
 
             # self-evaluating the result
             self.result_score, self.evaluation = self._self_evaluate()
@@ -94,8 +89,87 @@ class TestWorker(WorkerBase):
         #     score = float(evaluation.split("[[")[1].split("]]")[0])
         # except:
         #     score = 0
+        try:
+            score, evaluation = self.challenge.evaluate_solution(self.result["content"], num_test_cases=2000)
+        except Exception as e:
+            self.log(f"Failed to perform task")
+            self.log(e, level="error")
+            self.evaluation = f"Final score is 0. The submitted solution failed to run. Avoid following errors: {e}"
+            self.result_score = 0
+            raise e
+        evaluation = self._evaluation_compression(self.result["content"], evaluation)
 
-        score, evaluation = self.challenge.evaluate_solution(self.result["content"], num_test_cases=100)
-        self.log(f"Worker {self.worker_uuid} evaluated the result as {score}. Evaluation: {evaluation}.")
+        self.log(f"Worker: {self.worker_uuid}; Score: {score:.2f}")
 
         return score, evaluation
+    
+    def _evaluation_compression(self, solution, evaluation):
+        """Because the models have a limited number of tokens, the evaluation has to be compressed before sharing with the neighbours.
+        """
+        configuration_prompt_compression = (
+            "Act as a professional software engineer and python developer that gives feedback. Be extremely critical, concise, constructive and specific."
+            "You will be presented with a problem, candidate solution and evaluation."
+            "First, briefly summarize the solution in less than 5 sentences focusing on the main idea of the algorithm and including key operations or building blocks or the core idea behind the algorithm, and performance metrics."
+            "Thenextract the most important information from the solution and evaluation and condence it into at most 5 sentences to guide the developer to improve the solution and achieve the higest score."
+            "Look for potential mistakes or areas of improvement based on the evaluation, pose thought-provoking questions and important learnings. Include examples if possible."
+        )
+
+        content_prompt = f"Problem: {self.global_task} \n Solution: {solution} \n Evaluation: {evaluation} \n\n"
+
+        conversation_compression = [{"role": "system", "content": configuration_prompt_compression}, {"role": "user", "content": content_prompt}]
+        response = self.agent.call_model(conversation_compression)
+
+        self.log(f"Condencing the evaluation for the worker {self.worker_uuid}. \n\n Conent: {content_prompt} \n\n Compression: {response}", level="debug")
+        return response
+    
+    def _summarize_incoming_messages(self):
+        """Summarizes the incoming messages.
+        """
+        config_prompt_summarisation = (
+            "Act as a professional software engineer and python developer that gives feedback. Be extremely critical, concise, constructive and specific."
+            "You will be presented with a problem and a set of solutions and learnings other developers have shared with you."
+            "First, briefly summarize the best solution in less than 5 sentences focusing on the main idea of the algorithm and including key operations or building blocks or the core idea behind the algorithm, and performance metrics."
+            "Then, summarize all the learnings into at most 5 sentences to guide the developer to improve the solution further and achieve the highest score. Include examples if possible."
+        )
+
+        if len(self.incoming_messages) > 0:
+            # first, select top 4 of the best incomding messages. self.incoming_messages=list(tuple(result_score, result, evaluation))
+            self.incoming_messages = sorted(self.incoming_messages, key=lambda x: x[0], reverse=True)
+            self.incoming_messages = self.incoming_messages[:min(4, len(self.incoming_messages))]
+
+            best_solution = self.incoming_messages[0][1]
+
+            learnings = [x[2] for x in self.incoming_messages]
+            learnings = "\n\n".join(learnings)
+
+            content_prompt = f"Best potential solution so far:\n{best_solution} \n\n Learnings: \n{learnings} \n\n"
+            content_prompt = self.truncate_message(content_prompt, 4097-self.default_agent_parameters["model_params"]["max_tokens"])
+
+            conversation = [{"role": "system", "content": config_prompt_summarisation}, {"role": "user", "content": content_prompt}]
+
+            response = self.agent.call_model(conversation)            
+            self.log(f"Condencing the incoming messages. \n\n Conent: {content_prompt} \n\n Compression: {response}", level="debug")
+        else:
+            self.log(f"No incoming messages to summarize.", level="debug")
+            response = None
+
+        return response
+
+
+
+class ExplorerWorker(TestWorker):
+    def __init__(self, worker_uuid, swarm, challenge):
+        super().__init__(worker_uuid, swarm, challenge)
+        model_name = "gpt-3.5-turbo"
+        self.default_agent_parameters = {
+            "model_name": f"openai/{model_name}",
+            "model_params" : {
+                "model_name": model_name,
+                "temperature": 0.8,
+                "max_tokens": 1500
+                }
+            }
+
+        # implementing additional stuff
+        self.agent = self.AGENT_TYPES["gpt"](self.default_agent_parameters)
+        self.worker_type = "worker_explorer"

@@ -5,10 +5,14 @@ from tqdm import tqdm
 from pathlib import Path
 import traceback
 import concurrent.futures
+import pickle
+import matplotlib.pyplot as plt
+plt.switch_backend('agg')
+import seaborn as sns
 
 import logging
 
-from gptswarm.swarm.Workers.TestWorker import TestWorker
+from gptswarm.swarm.Workers.TestWorker import TestWorker, ExplorerWorker
 
 class Swarm:
     """This class is responsible for managing the swarm of agents.
@@ -38,6 +42,7 @@ class Swarm:
 
     WORKER_ROLES = {
         "test": TestWorker,
+        "explorer": ExplorerWorker,
     }
 
     CYCLES = ["compute", "share"]
@@ -76,7 +81,6 @@ class Swarm:
             "cycle": 0,
             "cycle_type": "compute"
         }
-        self.history = []
         self.logger = None
         
 
@@ -107,6 +111,26 @@ class Swarm:
         """
         return np.array(np.unravel_index(np.arange(np.prod(self.tensor_shape)), self.tensor_shape)).T
     
+    def _save_state(self):
+        """Saves the shared momory of the swarm each cycle"""
+        file_name = f"swarm_state_{self.cycle_state['cycle']}.pkl"
+        file_path = Path(__file__).parent / "run" / file_name
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(file_path, "wb") as f:
+            pickle.dump(self.shared_memory, f)
+
+        # also saving the image of swarm values
+        fig = plt.figure(figsize=(5, 5))
+        value_tensor = self.shared_memory["value_tensor"]
+        best_score = self.shared_memory["best_score"]
+        sns.heatmap(value_tensor, annot=True, cbar=True, cmap="YlGnBu", vmin=0, vmax=1)
+        plt.title(f"{self.cycle_state['cycle']} => History best: {best_score:.2f}; Step average {np.mean(value_tensor):.2f}")
+        fig_name = f"swarm_state_{self.cycle_state['cycle']}.png"
+        fig_path = Path(__file__).parent / "run" / fig_name
+        fig.savefig(fig_path)
+        plt.close(fig)
+    
     def get_neighbours(self, agent_uuid):
         """For now just returning the coordinates of the ajacent nodes in the tensor.
         """
@@ -125,41 +149,58 @@ class Swarm:
         """Runs the swarm for a given number of cycles or until the termination condition is met.
         """
         while self.cycle_state["cycle"] < max_cycles and not self.termination_condition():
-            self.log(f"Cycle {self.cycle_state['cycle']}")
-            self.log(f"Shered memory: {self.shared_memory}")
+            self.log(f"Cycle {self.cycle_state['cycle']}", level="info")
+            self.log(f"Shered memory: {self.shared_memory}", level="debug")
             self.iterate_cycle()
 
-    def _try_compute_agent(self, agent):
+    def _compute_agent(self, agent):
         try:
             agent.perform_task(self.cycle_state["cycle_type"])
+            return True
         except Exception as e:
-            self.log(f"Agent {agent.worker_uuid} failed to perform task {self.cycle_state['cycle_type']}")
-            # print e and also the full traceback
-            traceback.print_exc()
-            self.log(e)
-            agent.evaluation = e
-            agent.result_score = 0
+            self.log(f"Error while computing agent: {e}", level="error")
+            return False
 
     def iterate_cycle(self):
         """Iterates the swarm through the computational cycles.
-        TODO: parallelize the computation of the agents
         """
-        for agent in self.agents:
-            self._try_compute_agent(agent)
+        if self.cycle_state["cycle_type"] == "compute":
+            timeout_per_task = 45 # seconds
+            results = []
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                # sometimes the agents get frozen. Don't know why, yet, so implemented the timeout. Otherwise the swarm can get stuck
+                futures = {executor.submit(self._compute_agent, agent): agent for agent in self.agents}
 
-        self.cycle_state["value_tensor"] = self.get_value_tensor()
-        self.history.append(copy.deepcopy(self.cycle_state) | copy.deepcopy(self.shared_memory.copy()))
+                # As the tasks complete, process the results
+                for future in concurrent.futures.as_completed(futures, timeout=timeout_per_task*len(self.agents)):
+                    agent = futures[future]
+                    try:
+                        result = future.result(timeout=timeout_per_task)
+                        results.append(result)
+                        self.log(f"Agent returned {result}", level="debug")
+                    except concurrent.futures.TimeoutError:
+                        self.log(f"Agent timed out", level="error")
+                    except Exception as e:
+                        self.log(f"Agent raised an exception: {e}", level="debug")      
+
+        elif self.cycle_state["cycle_type"] == "share":         
+            for agent in tqdm(self.agents):
+                self._compute_agent(agent)
+            self._save_state()
+            self.log(f"Best solution:\n{self.shared_memory['best_answer']}", level="info")
         
-        next_cycle_type = self._get_next_cycle_type()
+        self.cycle_state["value_tensor"] = self.get_value_tensor()
+        self.shared_memory["value_tensor"] = self.get_value_tensor()
         self.cycle_state["cycle"] += 1
-        self.cycle_state["cycle_type"] = next_cycle_type
+        self.cycle_state["cycle_type"] = self._get_next_cycle_type()
 
     def _get_next_cycle_type(self):
         return self.CYCLES[(self.CYCLES.index(self.cycle_state["cycle_type"]) + 1) % len(self.CYCLES)]
 
     def termination_condition(self):
+        return False
         # Define your termination condition based on the problem or swarm state
-        if self.shared_memory["best_score"] > 0.99:
+        if self.shared_memory["best_score"] >= 1:
             self.log("Termination condition met!")
             return True
         else:
@@ -182,7 +223,7 @@ class Swarm:
             self.shared_memory["scores"] = [self.shared_memory["scores"][i] for i in n_best]
             self.shared_memory["answers"] = [self.shared_memory["answers"][i] for i in n_best]
 
-    def log(self, message, level="info"):
+    def log(self, agent="swarm", message="", level="info"):
         """Logs a message to the swarm log.
         Creates a logger if it doesn't exist yet.
 
@@ -195,18 +236,23 @@ class Swarm:
             self.log_file.touch()
 
         if self.logger is None :
+            # clear the log file
+            with open(self.log_file, "w") as f:
+                f.write("")
+            
             self.logger = logging.getLogger("swarm")
             self.logger.setLevel(logging.DEBUG)
             fh = logging.FileHandler(self.log_file)
             fh.setLevel(logging.DEBUG)
             ch = logging.StreamHandler()
-            ch.setLevel(logging.DEBUG)
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            ch.setLevel(logging.INFO)
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
             fh.setFormatter(formatter)
             ch.setFormatter(formatter)
             self.logger.addHandler(fh)
             self.logger.addHandler(ch)
 
+        message = f"{agent} - {message}"
         if level == "info":
             self.logger.info(message)
         elif level == "debug":

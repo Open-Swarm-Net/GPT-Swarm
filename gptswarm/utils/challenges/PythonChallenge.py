@@ -5,7 +5,6 @@ import sys
 import types
 import importlib.util
 import re
-import random
 from pathlib import Path
 
 from gptswarm.utils.challenges.ChallengeBase import ChallengeBase
@@ -88,7 +87,7 @@ class PythonChallenge(ChallengeBase):
             problem_statement = file.read()
         return problem_statement
     
-    def evaluate_solution(self, submitted_solution: str, num_test_cases=10):
+    def evaluate_solution(self, submitted_solution: str, num_test_cases=2000):
         """Python code of the potential solution is given by the LLM as a string.
         Therefore we first need to execute it.
         Then we need to test the solution from the Solution class in the solution python file.

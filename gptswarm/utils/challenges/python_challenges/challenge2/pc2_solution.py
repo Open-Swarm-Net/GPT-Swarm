@@ -104,7 +104,7 @@ class Solution(PythonChallengeSolutionBase):
             "aaaaAAAAAA000000123456",
             "aaaabbbbccccddeeddeeddeedd",
             "FFFFFFFFFFFFFFF11111111111111111111AAA",
-            "A1234567890aaabbbbccccc",
+            "A1234567890aaabbbbccccc"
 
         ]
 
@@ -125,7 +125,7 @@ class Solution(PythonChallengeSolutionBase):
             if time.time()-tick > 10:
                 test_solutions.append(0)
             else:
-                test_solutions.append(test_func(s=test_case))
+                test_solutions.append(test_func(test_case))
         tock = time.time()
         test_time = (tock - tick)
 
@@ -149,7 +149,13 @@ class Solution(PythonChallengeSolutionBase):
             runtime_score = 1
         else:
             runtime_score =  ideal_time / test_time
-        score = pow(correctness_score, 2)*pow(runtime_score, 1)
+
+        if correctness_score <= 1 and runtime_score <= 1:
+            score = pow(correctness_score, 2)*pow(runtime_score, 1)
+        elif correctness_score < 1 and runtime_score > 1:
+            score = correctness_score
+        elif correctness_score >=1:
+            score = correctness_score*runtime_score
 
         if score == 1:
             evaluations = f"Everything is correct. \n Runtime: {test_time*1000:.3f}ms"
