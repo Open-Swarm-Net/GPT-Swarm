@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 sys.path.append('..')
 
-from gptswarm.utils.challenges.PythonChallenge import PythonChallenge
-from gptswarm.swarm.Swarm import Swarm
+from swarmai.challenges.python_challenges.PythonChallenge import PythonChallenge
+from swarmai.Swarm import Swarm
 
 def load_keys():
     keys_file = Path("../keys.json")
@@ -18,14 +18,14 @@ def load_keys():
 
 def init_challenge():
     # defining the challenge the swarm will be working on
-    test_challenge_config = Path('D:/00Repos/GPT-Swarm/gptswarm/utils/challenges/python_challenges/challenge2/pc2_config.yaml')
+    test_challenge_config = Path('../swarmai/challenges/python_challenges/challenge2/pc2_config.yaml')
     challenge1 = PythonChallenge(test_challenge_config)
     print(challenge1.get_problem())
     return challenge1
 
 def run_swarm(challenge):
     # establishing the swarm
-    swarm1 = Swarm(challenge, (5, 5), {"test": 0.8, "explorer": 0.2})
+    swarm1 = Swarm(challenge, (5, 5), {"python developer": 0.8})
     swarm1.run_swarm(20)
     print(swarm1.shared_memory['best_answer']['content'])
 

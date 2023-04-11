@@ -10,11 +10,11 @@ class DictInternalMemory(InternalMemoryBase):
         super().__init__(n_entries)
         self.data = {}
 
-    def add_entry(self, score, entry):
+    def add_entry(self, score, content):
         """Add an entry to the internal memory.
         """
         random_key = str(uuid.uuid4())
-        self.data[random_key] = {"score": score, "entry": entry}
+        self.data[random_key] = {"score": score, "content": content}
 
         # keep only the best n entries
         sorted_data = sorted(self.data.items(), key=lambda x: x[1]["score"], reverse=True)
@@ -25,3 +25,8 @@ class DictInternalMemory(InternalMemoryBase):
         """
         sorted_data = sorted(self.data.items(), key=lambda x: x[1]["score"], reverse=True)
         return sorted_data[:n]
+    
+    def len(self):
+        """Get the number of entries in the internal memory.
+        """
+        return len(self.data)

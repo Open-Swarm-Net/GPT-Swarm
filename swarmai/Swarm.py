@@ -1,9 +1,15 @@
 import numpy as np
 import logging
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pathlib import Path
+from tqdm import tqdm
 
 from swarmai.utils.memory.DictSharedMemory import DictSharedMemory
 from swarmai.agents.GPTAgent import GPTAgent
 from swarmai.utils.CustomLogger import CustomLogger
+
+from swarmai.challenges.python_challenges.PythonChallenge import PythonChallenge
 
 class Swarm:
     """This class is responsible for managing the swarm of agents.
@@ -60,7 +66,8 @@ class Swarm:
 
         # some other attributes
         self.current_cycle = 0
-
+        self.best_score = 0
+        self.best_answer = ''
 
     def run_swarm(self, n_cycles):
         """Runs the swarm for a given number of cycles or until the termination condition is met.
@@ -69,6 +76,11 @@ class Swarm:
             self.current_cycle = cycle_n
             self.logger.info(f"Cycle {cycle_n}")
             self.iterate_cycle()
+
+            for agent in self.agents:
+                if agent.result_score > self.best_score:
+                    self.best_score = agent.result_score
+                    self.best_answer = agent.result
 
             if self._termination_condition():
                 break
@@ -87,15 +99,21 @@ class Swarm:
         For now just randomly allocating them in the swarm"""
         n_agents = np.prod(self.agents_tensor_shape)
         agent_keys = list(self.agent_role_distribution.keys())
+        p=[self.agent_role_distribution[k] for k in agent_keys]
+
+        # normalizing the distribution
+        p = np.array(p) / np.sum(p)
+
         agent_roles_n = np.random.choice(
             agent_keys,
             size=n_agents,
-            p=[self.agent_role_distribution[k] for k in agent_keys],
+            p=p,
         )
 
         agents = []
         for id, agent_role in enumerate(agent_roles_n):
             agent_id = id
+            #challenge_i = PythonChallenge(self.challenge.config_file_loc) # need to have this hack, because the challenge was not designed for multithreading
             agents.append(self.WORKER_ROLES[agent_role](agent_id, agent_role, self, self.shared_memory, self.challenge, self.logger))
             self.agents_ids.append(agent_id)
 
@@ -142,7 +160,7 @@ class Swarm:
         """
         agent_coords = self.agents_coords[self.agents_ids.index(agent_id)]
         distances = np.sum(np.abs(self.agents_coords - agent_coords), axis=1)
-        neighbours = self.agents[distances <= 1]
+        neighbours = self.agents[distances <= 1] # inlcuding the agent itself, that's correct => self-memory
         return neighbours
     
     def iterate_cycle(self):
@@ -150,12 +168,34 @@ class Swarm:
         for agent in self.agents:
             agent.run_async()
         
-        for agent in self.agents:
-            agent.job.join()
+        for agent in tqdm(self.agents):
+            agent.job.join(timeout = 60)
+            
+        # TODO: need to find a deadlock (╯°□°）╯︵ ┻━┻). crappy hack ahead
+        challenge_config = self.challenge.config_file_loc
+        self.challenge = PythonChallenge(challenge_config)
 
         # Save the state
         self.save_state()
 
     def save_state(self):
         """Saves the state of the swarm to a file"""
-        pass
+        
+        # TODO: implement the state from which to resume the swarm
+
+        # save a figure that presents the swarm performance
+        fig = plt.figure(figsize=(5, 5))
+        value_tensor = self.get_value_tensor()
+        best_score = self.best_score
+        sns.heatmap(value_tensor, annot=True, cbar=True, cmap="YlGnBu", vmin=0, vmax=1)
+        plt.title(f"{self.current_cycle} => History best: {best_score:.2f}; Step average {np.mean(value_tensor):.2f}")
+        fig_name = f"swarm_state_{self.current_cycle}.png"
+        fig_path = Path(self.logger.log_folder, fig_name)
+        fig.savefig(fig_path)
+        plt.close(fig)
+
+    def get_value_tensor(self):
+        value_tensor = np.zeros(self.agents_tensor_shape)
+        for agent, agent_coords in zip(self.agents, self.agents_coords):
+            value_tensor[tuple(agent_coords)] = agent.result_score
+        return value_tensor

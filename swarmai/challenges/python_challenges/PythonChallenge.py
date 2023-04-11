@@ -1,28 +1,13 @@
-from abc import ABC, abstractmethod
-from typing import Tuple
+import threading
 import yaml
 import sys
 import types
 import importlib.util
 import re
 from pathlib import Path
+import random
 
 from swarmai.challenges.ChallengeBase import ChallengeBase
-
-class PythonChallengeSolutionBase(ABC):
-    """Base class for the solution that every solution must implement
-    """
-    @abstractmethod    
-    def evaluate_solution(self, test_func: types.FunctionType) -> Tuple[float, str]:
-        """Evaluates whatever you want. The evaluation function is absolutely flexible.
-        Args:
-            test_func (types.FunctionType): The function that is created from the submitted code
-
-        Returns:
-            float: score of the solution. Is between 0 and 1. Can be non-binary if we want to evaluate by the closeness of the solution to the correct one.
-            str: output of the solution including possible errors.
-        """
-        raise NotImplementedError("test_solution method must be implemented in the derived class")        
 
 class PythonChallenge(ChallengeBase):
     def __init__(self, config_file):
@@ -34,7 +19,7 @@ class PythonChallenge(ChallengeBase):
 
         TODO: evaluate the runtime and memory usage of the submitted code
         """
-        config_file_loc = Path(config_file)
+        self.config_file_loc = Path(config_file)
         self.config = self._load_config(config_file)
 
         # unpack the problem config
@@ -45,8 +30,11 @@ class PythonChallenge(ChallengeBase):
         self.solution_file = self.config['solution_file'] # python file with a Solution class that inherits from PythonChallengeSolutionBase
 
         # fixing the paths
-        self.solution_file = config_file_loc.parent / self.solution_file
-        self.problem_statement_file = config_file_loc.parent / self.problem_statement_file
+        self.solution_file = self.config_file_loc.parent / self.solution_file
+        self.problem_statement_file = self.config_file_loc.parent / self.problem_statement_file
+
+        with open(self.problem_statement_file, 'r') as file:
+            self.problem_statement = file.read()
 
         # importing the solution as a module
         self.solution_module = self._import_solution_module(self.solution_file)
@@ -73,7 +61,7 @@ class PythonChallenge(ChallengeBase):
             raise ValueError("No valid code block found in the submitted solution")
     
     def _import_solution_module(self, solution_file):
-        spec = importlib.util.spec_from_file_location("solution_module", solution_file)
+        spec = importlib.util.spec_from_file_location(f"solution_module_{random.randint(0, 10000000)}", solution_file)
         solution_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(solution_module)
         solution_instance = solution_module.Solution()
@@ -82,9 +70,7 @@ class PythonChallenge(ChallengeBase):
     def get_problem(self):
         """Returns a coding problem to be solved as a string.
         """
-        with open(self.problem_statement_file, 'r') as file:
-            problem_statement = file.read()
-        return problem_statement
+        return self.problem_statement
     
     def evaluate_solution(self, submitted_solution: str, num_test_cases=2000):
         """Python code of the potential solution is given by the LLM as a string.
@@ -109,5 +95,10 @@ class PythonChallenge(ChallengeBase):
         except Exception as e:
             return 0, f"{error_base}\nError: {e}"
 
-        score, eval = self.solution_module.evaluate_solution(func, n_tests=num_test_cases)
+        try:
+            score, eval = self.solution_module.evaluate_solution(func, n_tests=num_test_cases)
+        except Exception as e:
+            score, eval = 0, f"Error during evaluation of the submitted code. Make sure you have a function with the name {self.function_name} and that it is implemented correctly.\nError: {e}"
+
         return score, eval
+    

@@ -40,26 +40,41 @@ class GPTAgent(AgentBase):
         self.evaluation = ''
 
     def perform_task(self):
-        """main method of the agent that defines the task it performs
+        """main method of the agent that defines the task it performs.
+        Executed in the abstract class.
         """
+        cycle_prompt = ''
+
         self.logger.info(f"Agent {self.agent_id} is performing the task")
         role_prompt = f"Act as a professional {self.agent_role}.\n"
-        configuration_prompt = ""
+        cycle_prompt += role_prompt
 
+        # first, we summarize the incoming messages from the internal memory
+        incomming_summary = self._summarize_incoming_messages()
+        if incomming_summary:
+            cycle_prompt += incomming_summary
+            cycle_prompt += "Now, improve the solution."
+
+        # then make the model generate a new solution
         conversation = [
-            {"role": "system", "content": role_prompt+configuration_prompt},
+            {"role": "system", "content": cycle_prompt},
             {"role": "user", "content": self.global_task}
         ]
 
         result = self.call_model(conversation)
         self.result = result
-        self.result_score = 0.5 
-        
+
+        # evaluate the result
+        self.result_score, self.evaluation = self._self_evaluate()
+
+        self.logger.info(f"Agent: {self.agent_id} finished; Score: {self.result_score:.2f}")
 
     def share(self):
-        """Main method of the agent that defines how it shares its results with the neighbors
+        """Main method of the agent that defines how it shares its results with the neighbors.
+        Executed in the abstract class.
         """
-        self._send_data_to_neighbors({"score": self.result_score, "content": self.result + "\n" + self.evaluation})
+        pass
+        #self._send_data_to_neighbors({"score": self.result_score, "content": self.result + "\n" + self.evaluation})
     
     def truncate_message(self, message, max_tokens):
         """Truncate a message to a maximum number of tokens.
@@ -83,7 +98,7 @@ class GPTAgent(AgentBase):
         new_len = int(max_tokens*conversion_factor)
         self.logger.debug(f"Truncating message from {symbol_count} to {new_len} symbols", level="debug")
         return message[:new_len]
-        
+
     def call_model(self, conversation, max_tokens=None, temperature=None):
         """Calls the gpt-3.5 or gpt-4 model to generate a response to a conversation.
 
@@ -113,4 +128,69 @@ class GPTAgent(AgentBase):
             
         response = openai.ChatCompletion.create(model=self.model_name, messages=conversation, max_tokens=max_tokens, temperature=temperature, n=1)
         return response["choices"][0]["message"]["content"]
+    
+    def _self_evaluate(self):
+        """Evaluates the result of the computation.
+        Normal workers should test the solution using the challenge's evaluate_solution method.
+        Some workers in the future can perform self-evaluation.
+        """
+        try:
+            score, evaluation = self.challenge.evaluate_solution(self.result, num_test_cases=2000)
+        except Exception as e:
+            self.logger.info(f"Agent {self.agent_id} failed to run the solution.")
+            self.logger.error(e)
+            self.evaluation = f"Final score is 0. The submitted solution failed to run. Avoid following errors: {e}"
+            self.result_score = 0
+        
+        evaluation = self._evaluation_compression(self.result, evaluation)
+
+        return score, evaluation
+    
+    def _evaluation_compression(self, solution, evaluation):
+        """Because the models have a limited number of tokens, the evaluation has to be compressed before sharing with the neighbours.
+        """
+        configuration_prompt_compression = (
+            "Act as a professional software engineer and python developer that gives feedback. Be extremely critical, concise, constructive and specific."
+            "You will be presented with a problem, candidate solution and evaluation."
+            "First, briefly summarize the solution in less than 5 sentences focusing on the main idea of the algorithm and including key operations or building blocks or the core idea behind the algorithm, and performance metrics."
+            "Thenextract the most important information from the solution and evaluation and condence it into at most 5 sentences to guide the developer to improve the solution and achieve the higest score."
+            "Look for potential mistakes or areas of improvement based on the evaluation, pose thought-provoking questions and important learnings. Include examples if possible."
+        )
+
+        content_prompt = f"Problem: {self.global_task} \n Solution: {solution} \n Evaluation: {evaluation} \n\n"
+
+        conversation_compression = [{"role": "system", "content": configuration_prompt_compression}, {"role": "user", "content": content_prompt}]
+        response = self.call_model(conversation_compression)
+
+        self.logger.debug(f"Condencing the evaluation for the worker {self.agent_id}. \n\n Conent: {content_prompt} \n\n Compression: {response}")
+        return response
+
+    def _summarize_incoming_messages(self):
+        """Summarizes the incoming messages. They are stored in the self.internal_memory as a dict {"score": score, "content": content}
+        """
+        config_prompt_summarisation = (
+            f"Act as a professional {self.agent_role} that gives feedback. Be extremely critical, concise, constructive and specific."
+            "You will be presented with a problem and a set of solutions and learnings other people have shared with you."
+            "First, briefly summarize the best solution in less than 5 sentences focusing on the main ideas, key operations or building blocks, and performance metrics."
+            "Then, summarize all the learnings into at most 5 sentences to guide the person to improve the solution further and achieve the highest score. Include examples if possible."
+        )
+
+        if self.internal_memory.len() > 0:
+            best_solution = self.internal_memory.get_top_n(n=1)
+
+            learnings = [x["content"] for x in self.internal_memory]
+            learnings = "\n\n".join(learnings)
+
+            content_prompt = f"Best potential solution so far:\n{best_solution} \n\n Learnings: \n{learnings} \n\n"
+            content_prompt = self.truncate_message(content_prompt, 4097-self.max_response_tokens)
+
+            conversation = [{"role": "system", "content": config_prompt_summarisation}, {"role": "user", "content": content_prompt}]
+
+            response = self.call_model(conversation)            
+            self.logger.debug(f"Condencing the incoming messages. \n\n Conent: {content_prompt} \n\n Compression: {response}")
+        else:
+            self.logger.debug(f"No incoming messages to summarize.")
+            response = None
+
+        return response
         

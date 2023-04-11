@@ -4,7 +4,13 @@ import threading
 def synchronized(method):
     def wrapper(self, *args, **kwargs):
         with self.lock:
-            return method(self, *args, **kwargs)
+            self.lock.acquire(timeout = 5)
+            try:
+                return method(self, *args, **kwargs)
+            except Exception as e:
+                print(f"Failed to execute {method.__name__}: {e}")
+            finally:
+                self.lock.release()
     return wrapper
 
 class ChallengeBase(ABC):

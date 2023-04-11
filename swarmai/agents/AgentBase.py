@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import threading
 import queue
+import sys
 
 from swarmai.utils.memory.InternalMemoryBase import InternalMemoryBase
 
@@ -46,6 +47,7 @@ class AgentBase(ABC):
         self.internal_memory = None
         self.neighbor_queues = []
         self.message_queue = queue.Queue()
+        
         self.global_task = self.challenge.get_problem()
 
     def run_async(self):
@@ -60,7 +62,6 @@ class AgentBase(ABC):
         self._retrive_messages()
         self.perform_task()
         self.share()
-        self.logger.info(f"Agent {self.agent_id} finished. Score: {self.result_score:.2f}")
 
     @abstractmethod
     def perform_task(self):
@@ -88,6 +89,7 @@ class AgentBase(ABC):
         Args:
             message (dict): The message from the neighbor.
         """
+        self.logger.debug(f"Agent {self.agent_id} received message: {message}")
         self.internal_memory.add_entry(message["score"], message["content"])
     
     def _send_data_to_neighbors(self, data):
@@ -97,6 +99,7 @@ class AgentBase(ABC):
             data (dict): The data to send: {"score": score, "content": content}
         """
         for queue in self.neighbor_queues:
+            self.logger.debug(f"Agent {self.agent_id} sent message: {data}")
             queue.put(data)
 
     def _send_data_to_shared_memory(self, data):
@@ -106,7 +109,13 @@ class AgentBase(ABC):
             data (dict): The data to send.
         """
         with self.shared_memory.lock:
-            self.shared_memory.add_entry(data)
+            self.shared_memory.lock.acquire(timeout = 30)
+            try:
+                self.shared_memory.add_entry(data)
+            except Exception as e:
+                self.logger.error(f"Agent {self.agent_id} failed to add entry to the shared memory: {e}")
+            finally:
+                self.shared_memory.lock.release()
 
     def reset(self):
         # Reset the necessary internal state while preserving memory

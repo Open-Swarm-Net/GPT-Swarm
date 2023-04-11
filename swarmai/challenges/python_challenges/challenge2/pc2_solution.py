@@ -3,7 +3,7 @@ import random
 import string
 import time
 
-from gptswarm.utils.challenges.PythonChallenge import PythonChallengeSolutionBase
+from swarmai.challenges.python_challenges.PythonChallengeSolutionBase import PythonChallengeSolutionBase
 
 class Solution(PythonChallengeSolutionBase):
     def strongPasswordChecker(self, s: str) -> int:
@@ -57,7 +57,7 @@ class Solution(PythonChallengeSolutionBase):
         - doesn't have an uppercase letter
         """
         # Generate random password length between 1 and 50
-        password_length = random.randint(1, 50)
+        password_length = random.randint(1, 30)
         password = self.random_password(password_length)
 
         # Check if password has 3 repeating characters in a row
@@ -84,12 +84,12 @@ class Solution(PythonChallengeSolutionBase):
 
         if len(password) == 0:
             # in case we removed all characters, generate a new password
-            password_length = random.randint(2, 40)
+            password_length = random.randint(2, 30)
             password = self.random_password(password_length)
 
         return password
 
-    def evaluate_solution(self, test_func, n_tests=10000):
+    def evaluate_solution(self, test_func, n_tests=10):
         """Evaluates whatever you want. The evaluation function is absolutely flexible.
         """
         default_cases = [
@@ -105,9 +105,7 @@ class Solution(PythonChallengeSolutionBase):
             "aaaabbbbccccddeeddeeddeedd",
             "FFFFFFFFFFFFFFF11111111111111111111AAA",
             "A1234567890aaabbbbccccc"
-
         ]
-
         test_cases = default_cases*int(n_tests/(len(default_cases)*2)) + [self.gen_random_input() for _ in range(int(n_tests/2))]
         correct_solutions = []
         test_solutions = []
@@ -115,14 +113,17 @@ class Solution(PythonChallengeSolutionBase):
         # create ideal solutions and also time it
         tick = time.time()
         for test_case in test_cases:
-            correct_solutions.append(self.strongPasswordChecker(s=test_case))
+            if time.time()-tick > 5:
+                correct_solutions.append(0)
+            else:
+                correct_solutions.append(self.strongPasswordChecker(s=test_case))
         tock = time.time()
         ideal_time = (tock - tick)
 
         # create test solutions and also time it
         tick = time.time()
         for test_case in test_cases:
-            if time.time()-tick > 10:
+            if time.time()-tick > 5:
                 test_solutions.append(0)
             else:
                 test_solutions.append(test_func(test_case))
@@ -150,6 +151,9 @@ class Solution(PythonChallengeSolutionBase):
         else:
             runtime_score =  ideal_time / test_time
 
+        if runtime_score > 1.5:
+            runtime_score = 1.5
+
         if correctness_score <= 1 and runtime_score <= 1:
             score = pow(correctness_score, 2)*pow(runtime_score, 1)
         elif correctness_score < 1 and runtime_score > 1:
@@ -170,9 +174,9 @@ class Solution(PythonChallengeSolutionBase):
                 false_ids = random.sample(false_ids, min(n_examples, len(false_ids)))
                 for false_id in false_ids:
                     evaluations += f"Input: {test_cases[false_id]}\nResult: {test_solutions[false_id]}\nExpected: {correct_solutions[false_id]}\nCorrect: {False}\n"
-                
-
         return score, evaluations
+
+        
         
 
 
