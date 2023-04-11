@@ -7,6 +7,7 @@ from tqdm import tqdm
 
 from swarmai.utils.memory.DictSharedMemory import DictSharedMemory
 from swarmai.agents.GPTAgent import GPTAgent
+from swarmai.agents.GPTAgent import ExplorerGPT
 from swarmai.utils.CustomLogger import CustomLogger
 
 from swarmai.challenges.python_challenges.PythonChallenge import PythonChallenge
@@ -39,6 +40,7 @@ class Swarm:
 
     WORKER_ROLES = {
         "python developer": GPTAgent,
+        "explorer python": ExplorerGPT,
     }
 
     def __init__(self, challenge, agents_tensor_shape, agent_role_distribution):

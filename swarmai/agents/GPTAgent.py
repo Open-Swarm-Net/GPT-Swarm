@@ -32,7 +32,7 @@ class GPTAgent(AgentBase):
         openai.api_key = os.getenv("OPENAI_API_KEY")
         self.model_name = "gpt-3.5-turbo"
         self.max_response_tokens = 1500
-        self.temperature = 0.5
+        self.temperature = 0.1
 
         # some other parameters
         self.result = ''
@@ -193,4 +193,10 @@ class GPTAgent(AgentBase):
             response = None
 
         return response
-        
+
+
+class ExplorerGPT(GPTAgent):
+    def __init__(self, agent_id, agent_role, swarm, shared_memory, challenge, logger):
+        super().__init__(agent_id, agent_role, swarm, shared_memory, challenge, logger)
+
+        self.temperature = 0.5

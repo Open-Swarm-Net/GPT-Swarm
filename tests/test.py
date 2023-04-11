@@ -25,7 +25,7 @@ def init_challenge():
 
 def run_swarm(challenge):
     # establishing the swarm
-    swarm1 = Swarm(challenge, (5, 5), {"python developer": 0.8})
+    swarm1 = Swarm(challenge, (7, 7), {"python developer": 0.8, "explorer python": 0.2})
     swarm1.run_swarm(20)
     print(swarm1.shared_memory['best_answer']['content'])
 
