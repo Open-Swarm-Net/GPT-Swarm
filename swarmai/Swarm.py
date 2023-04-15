@@ -65,7 +65,7 @@ class Swarm:
         self.lock = threading.Lock() # need this one to accept shared memory updates from multiple threads
 
         # creating the logger
-        self.logger = self._logger_setup()
+        self.logger = CustomLogger(self.data_dir)
 
         # creating agents
         self.agents_ids = []
@@ -82,7 +82,7 @@ class Swarm:
         """
         for agent in self.agents:
             agent.max_cycles = n_cycles
-            self.logger.info(f"Starting agent {agent.agent_id} with role {agent.agent_role}")
+            self.log(f"Starting agent {agent.agent_id} with role {agent.agent_role}")
             agent.start()
         for agent in self.agents:
             agent.join()
@@ -111,7 +111,7 @@ class Swarm:
 
         np.random.shuffle(agents)
 
-        self.logger.info(f"Created {len(agents)} agents with roles: {agent_roles_n}")
+        self.log(f"Created {len(agents)} agents with roles: {agent_roles_n}")
           
         return np.array(agents)
     
@@ -120,31 +120,8 @@ class Swarm:
         For now just creating a list of coordinates of the same shape as self.agents
         """
         agents_roles = np.array([a.agent_role[0] for a in self.agents]).reshape(self.agents_tensor_shape)
-        self.logger.info(f"Agents roles:\n{agents_roles}")
+        self.log(f"Agents roles:\n{agents_roles}")
         return np.array(np.unravel_index(np.arange(np.prod(self.agents_tensor_shape)), self.agents_tensor_shape)).T
-    
-    def _logger_setup(self):
-        """Creates the logger object"""
-        log_file = f"{self.data_dir}/swarm.log"
-
-        # Create a custom logger instance and configure it
-        logger = CustomLogger("SwarmLogger")
-        logger.log_file = log_file
-        logger.log_folder = self.data_dir
-        logger.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-        fh = logging.FileHandler(log_file)
-        fh.setLevel(logging.DEBUG)
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
-
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
-        ch.setFormatter(formatter)
-        logger.addHandler(ch)
-
-        return logger
 
     def get_neighbours(self, agent_id):
         """For now just returning the coordinates of the ajacent nodes in the tensor.
@@ -184,7 +161,7 @@ class Swarm:
             status = self.shared_memory.add_entry(score, agent_id, agent_cycle, content)
             return status
         except Exception as e:
-            self.logger.error(f"Failed to add info to the swarm: {e}")
+            self.log(f"Failed to add info {data} to the swarm: {e}", level="error")
             return False
 
     def save_state(self):
@@ -209,5 +186,19 @@ class Swarm:
             value_tensor[tuple(agent_coords)] = agent.result_score
         return value_tensor
     
-
+    def log(self, message, level="info"):
+        level = level.lower()
+        if level == "info":
+            level = 20
+        elif level == "debug":
+            level = 10
+        elif level == "warning":
+            level = 30
+        elif level == "error":
+            level = 40
+        elif level == "critical":
+            level = 50
+        else:
+            level = 0
+        self.logger.log(level=level, msg= {'message': message})
 

@@ -48,7 +48,7 @@ class GPTAgent(AgentBase):
         self.current_step = "perform_task"
         cycle_prompt = ''
 
-        self.log(f"Performing the task", level="info")
+        self.log(f"Performing the task")
         cycle_prompt += self.role_prompt
 
         # first, we summarize the incoming messages from the internal memory
@@ -163,13 +163,13 @@ class GPTAgent(AgentBase):
         conversation_compression = [{"role": "system", "content": configuration_prompt}, {"role": "user", "content": content_prompt}]
         response = self.call_model(conversation_compression)
 
-        self.log(f"Condencing the evaluation for the worker {self.agent_id}. \n\n Conent: {content_prompt} \n\n Compression: {response}", level="debug")
+        self.log(f"Condencing the evaluation for the worker {self.agent_id}. \n\n *Content*: {content_prompt} \n\n *Compression*: {response}", level="debug")
         return response
 
     def _summarize_incoming_messages(self):
         """Summarizes the incoming messages. They are stored in the self.internal_memory as a dict {"score": score, "content": content}
         """
-        self.current_step = "summarize_incoming_messages"
+        self.current_step = "summarize_incoming"
         config_prompt = self.role_prompt + PromptFactory.StandardPrompts.solutions_summarisation
 
         if self.internal_memory.len() > 0:
@@ -184,7 +184,7 @@ class GPTAgent(AgentBase):
             conversation = [{"role": "system", "content": config_prompt}, {"role": "user", "content": content_prompt}]
 
             response = self.call_model(conversation)            
-            self.log(f"Condencing the incoming messages. \n\n Conent: {content_prompt} \n\n Compression: {response}", level="debug")
+            self.log(f"Condencing the incoming messages. \n\n *Content*: {content_prompt} \n\n *Compression*: {response}", level="debug")
         else:
             self.log(f"No incoming messages to summarize.", level="debug")
             response = None

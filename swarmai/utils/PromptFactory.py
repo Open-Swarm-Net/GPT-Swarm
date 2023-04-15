@@ -30,14 +30,15 @@ class PromptFactory:
         solutions_summarisation=(
             f"Be extremely critical, concise, constructive and specific."
             "You will be presented with a problem and a set of solutions and learnings other people have shared with you."
-            "First, briefly summarize the best solution in less than 5 sentences focusing on the main ideas, key building blocks, and performance metrics."
-            "Then, summarize all the learnings into at most 5 sentences to guide the person to improve the solution further and achieve the highest score. Include examples if possible."
+            "First, briefly summarize the best solution in 2 sentences focusing on the main ideas, key building blocks, and performance metrics."
+            "Then, summarize all the learnings into 5 sentences to guide the person to improve the solution further and achieve the highest score."
+            "Include examples if possible."
         )
 
         single_solution_summarisation=(
             "Be extremely critical, concise, constructive and specific. You will be presented with a problem, candidate solution and evaluation."
-            "First, briefly summarize the solution in less than 5 sentences focusing on the main idea of the algorithm and including key building blocks, and performance metrics."
-            "Thenextract the most important information from the evaluation and condence it into at most 5 sentences to guide the person to improve the solution and achieve the higest score."
+            "First, briefly summarize the solution in 2 sentences focusing on the main idea of the algorithm and including key building blocks, and performance metrics."
+            "Then extract the most important information from the evaluation and condence it into 2 sentences to guide the person to improve the solution and achieve the higest score."
             "Look for potential mistakes or areas of improvement based on the evaluation, pose thought-provoking questions and important learnings. Include examples if possible."
         )
 

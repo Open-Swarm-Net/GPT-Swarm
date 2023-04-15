@@ -128,6 +128,7 @@ class AgentBase(ABC, threading.Thread):
         Args:
             data (dict): The data to send: {"score": score, "content": content}
         """
+        self.log(f"To shared memory: {data}", level = "debug")
         _ = self.swarm.add_shared_info(self, data) # the lock is set in the swarm
 
     def reset(self):
@@ -156,6 +157,6 @@ class AgentBase(ABC, threading.Thread):
                 level = 50
             else:
                 level = 0
-            
-        message = f"Agent {self.agent_id} - Cycle {self.cycle} - {self.current_step} - {message}"
+
+        message = {"agent_id": self.agent_id, "cycle": self.cycle, "step": self.current_step, "message": message}
         self.logger.log(level, message)
