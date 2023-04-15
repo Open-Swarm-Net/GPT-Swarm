@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 import threading
 import queue
-import sys
 
-from swarmai.utils.memory.InternalMemoryBase import InternalMemoryBase
+from swarmai.challenges.python_challenges.PythonChallenge import PythonChallenge
 
 class AgentJob(threading.Thread):
     """A class that handles multithreading logic
@@ -16,7 +15,7 @@ class AgentJob(threading.Thread):
     def run(self):
         self.function(*self.args)
 
-class AgentBase(ABC):
+class AgentBase(ABC, threading.Thread):
     """Abstract base class for agents in the swarm.
     
     - Agents are the entities that perform the task in the swarm.
@@ -24,7 +23,7 @@ class AgentBase(ABC):
     - Implements the threading. Thread class to allow the swarm to run in parallel.
     """
 
-    def __init__(self, agent_id, agent_role, swarm, shared_memory, challenge, logger):
+    def __init__(self, agent_id, agent_role, swarm, shared_memory, challenge, logger, max_cycles = 10):
         """Initialize the agent.
         
         Args:
@@ -35,33 +34,54 @@ class AgentBase(ABC):
             challenge (Challenge implementation): The challenge object.
             logger (Logger): The logger object.
         """
-        super().__init__()
+        threading.Thread.__init__(self)
+        ABC.__init__(self)
         self.agent_id = agent_id
         self.agent_role = agent_role
         self.swarm = swarm
         self.shared_memory = shared_memory
         self.challenge = challenge
         self.logger = logger
+        self.max_cycles = max_cycles
 
         # some mandatory components
         self.internal_memory = None
         self.neighbor_queues = []
         self.message_queue = queue.Queue()
+        self.current_step = "init"
+        self.ifRun = True
+        self.cycle = 0
         
         self.global_task = self.challenge.get_problem()
 
-    def run_async(self):
-        """Run the agent asynchronously
-        """
-        self.job = AgentJob(self.run, ())
-        self.job.start()
-
     def run(self):
-        """Run the agent
+        while self.ifRun:
+            self.job = AgentJob(self.agent_iteration, ())
+            self.job.start()
+            self.job.join(timeout = 60) # unfortunately need to have a timeout to avoid deadlocks for now.
+
+            # TODO: need to find a deadlock (╯°□°）╯︵ ┻━┻). crappy hack ahead
+            # reinstantiating the challenge object that got locked. Currently the problem is in python challenge
+            if self.job.is_alive():
+                self.log("Stuck. Restarting the challenge object.", level = "error")
+                challenge_config = self.challenge.config_file_loc
+                self.challenge = PythonChallenge(challenge_config)
+
+            self.cycle += 1
+            if self.cycle >= self.max_cycles:
+                self.ifRun = False
+
+    def agent_iteration(self):
+        """Main iteration of the agent.
         """
         self._retrive_messages()
         self.perform_task()
         self.share()
+
+    def terminate(self):
+        """Terminate the agent
+        """
+        self.ifRun = False
 
     @abstractmethod
     def perform_task(self):
@@ -99,23 +119,16 @@ class AgentBase(ABC):
             data (dict): The data to send: {"score": score, "content": content}
         """
         for queue in self.neighbor_queues:
-            self.logger.debug(f"Agent {self.agent_id} sent message: {data}")
+            self.log(f"Sent message: {data}", level = "debug")
             queue.put(data)
 
-    def _send_data_to_shared_memory(self, data):
+    def _send_data_to_swarm(self, data):
         """Send data to the shared memory.
 
         Args:
-            data (dict): The data to send.
+            data (dict): The data to send: {"score": score, "content": content}
         """
-        with self.shared_memory.lock:
-            self.shared_memory.lock.acquire(timeout = 30)
-            try:
-                self.shared_memory.add_entry(data)
-            except Exception as e:
-                self.logger.error(f"Agent {self.agent_id} failed to add entry to the shared memory: {e}")
-            finally:
-                self.shared_memory.lock.release()
+        _ = self.swarm.add_shared_info(self, data) # the lock is set in the swarm
 
     def reset(self):
         # Reset the necessary internal state while preserving memory
@@ -124,3 +137,25 @@ class AgentBase(ABC):
     def stop(self):
         # Set the termination flag
         self.should_run = False
+
+    def log(self, message, level = "info"):
+        """Need to extend the logging a bit to include the agent id and the step name.
+        Otherwise too hard to debug.
+        """
+        if isinstance(level, str):
+            level = level.lower()
+            if level == "info":
+                level = 20
+            elif level == "debug":
+                level = 10
+            elif level == "warning":
+                level = 30
+            elif level == "error":
+                level = 40
+            elif level == "critical":
+                level = 50
+            else:
+                level = 0
+            
+        message = f"Agent {self.agent_id} - Cycle {self.cycle} - {self.current_step} - {message}"
+        self.logger.log(level, message)

@@ -1,0 +1,13 @@
+Todo:
+- ^ prompt factory
+- ^ find a good challenge that showcases the capabilities
+- ^ ascynchronous execution
+- shared memory
+- try adding auto-gpt to the swarm
+
+Bugs:
+- sometimes a deadlock (or thread crash) in the PythonChallenge during evaluate_solution
+
+Done:
+- multithreading
+- individual logging for better debugging => added agent ide and the step to the log

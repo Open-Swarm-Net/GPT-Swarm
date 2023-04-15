@@ -161,7 +161,8 @@ class Solution(PythonChallengeSolutionBase):
         elif correctness_score >=1:
             score = correctness_score*runtime_score
 
-        if score == 1:
+        if score >= 1:
+            score = 1
             evaluations = f"Everything is correct. \n Runtime: {test_time*1000:.3f}ms"
         else:
             evaluations = f"Total score: {score:.3f}; {correctness_score*100:.2f}% test cases are solved correctly; \n Runtime: {test_time*1000:.3f}ms, which is {1/runtime_score:.3f} times slower than the ideal solution."

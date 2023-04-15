@@ -90,8 +90,6 @@ class PythonChallenge(ChallengeBase):
         try:
             module = self._load_submitted_code(submitted_solution)
             func = getattr(module, self.function_name)
-        except ValueError as ve:
-            return 0, f"{error_base}\nError: {str(ve)}"
         except Exception as e:
             return 0, f"{error_base}\nError: {e}"
 

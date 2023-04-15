@@ -2,7 +2,7 @@ from typing import List
 import random
 import time
 
-from gptswarm.utils.challenges.PythonChallenge import PythonChallengeSolutionBase
+from swarmai.challenges.python_challenges.PythonChallengeSolutionBase import PythonChallengeSolutionBase
 
 class Solution(PythonChallengeSolutionBase):
     def _isIdealPermutation(self, A: List[int]) -> bool:

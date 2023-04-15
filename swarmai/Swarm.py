@@ -1,15 +1,16 @@
 import numpy as np
 import logging
+import threading
+from datetime import datetime
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
-from tqdm import tqdm
 
 from swarmai.utils.memory.DictSharedMemory import DictSharedMemory
 from swarmai.agents.GPTAgent import GPTAgent
 from swarmai.agents.GPTAgent import ExplorerGPT
 from swarmai.utils.CustomLogger import CustomLogger
-
 from swarmai.challenges.python_challenges.PythonChallenge import PythonChallenge
 
 class Swarm:
@@ -55,8 +56,13 @@ class Swarm:
         self.agents_tensor_shape = agents_tensor_shape
         self.agent_role_distribution = agent_role_distribution
 
+        self.data_dir = Path(__file__).parent.parent.resolve() / "runs" / f"run_{self.challenge.problem_name.lower().replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+
         # creating shared memory
-        self.shared_memory = DictSharedMemory()
+        self.shared_memory_file = self.data_dir / 'shared_memory.json'
+        self.shared_memory = DictSharedMemory(self.shared_memory_file)
+        self.lock = threading.Lock() # need this one to accept shared memory updates from multiple threads
 
         # creating the logger
         self.logger = self._logger_setup()
@@ -74,27 +80,12 @@ class Swarm:
     def run_swarm(self, n_cycles):
         """Runs the swarm for a given number of cycles or until the termination condition is met.
         """
-        for cycle_n in range(n_cycles):
-            self.current_cycle = cycle_n
-            self.logger.info(f"Cycle {cycle_n}")
-            self.iterate_cycle()
-
-            for agent in self.agents:
-                if agent.result_score > self.best_score:
-                    self.best_score = agent.result_score
-                    self.best_answer = agent.result
-
-            if self._termination_condition():
-                break
-
-    def _termination_condition(self):
-        return False
-        # Define your termination condition based on the problem or swarm state
-        if self.shared_memory["best_score"] >= 1:
-            self.log("Termination condition met!")
-            return True
-        else:
-            return False
+        for agent in self.agents:
+            agent.max_cycles = n_cycles
+            self.logger.info(f"Starting agent {agent.agent_id} with role {agent.agent_role}")
+            agent.start()
+        for agent in self.agents:
+            agent.join()
 
     def _create_agents(self):
         """Creates the tesnor of agents according to the tensor shape and the agent role distribution.
@@ -115,7 +106,6 @@ class Swarm:
         agents = []
         for id, agent_role in enumerate(agent_roles_n):
             agent_id = id
-            #challenge_i = PythonChallenge(self.challenge.config_file_loc) # need to have this hack, because the challenge was not designed for multithreading
             agents.append(self.WORKER_ROLES[agent_role](agent_id, agent_role, self, self.shared_memory, self.challenge, self.logger))
             self.agents_ids.append(agent_id)
 
@@ -135,13 +125,12 @@ class Swarm:
     
     def _logger_setup(self):
         """Creates the logger object"""
-        log_folder = "logs"
-        log_file = f"{log_folder}/swarm.log"
+        log_file = f"{self.data_dir}/swarm.log"
 
         # Create a custom logger instance and configure it
         logger = CustomLogger("SwarmLogger")
         logger.log_file = log_file
-        logger.log_folder = log_folder
+        logger.log_folder = self.data_dir
         logger.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -170,7 +159,7 @@ class Swarm:
         for agent in self.agents:
             agent.run_async()
         
-        for agent in tqdm(self.agents):
+        for agent in self.agents:
             agent.job.join(timeout = 60)
             
         # TODO: need to find a deadlock (╯°□°）╯︵ ┻━┻). crappy hack ahead
@@ -179,6 +168,24 @@ class Swarm:
 
         # Save the state
         self.save_state()
+
+    def add_shared_info(self, agent, data):
+        """Adds data to the shared memory
+        Args:
+            agent (AgentBase): The agent that is adding the data
+            data (dict): The data to add
+        """
+        # the mulithreading is handled by the shared memory
+        try:
+            score = data["score"]
+            content = data["content"]
+            agent_id = agent.agent_id
+            agent_cycle = agent.cycle
+            status = self.shared_memory.add_entry(score, agent_id, agent_cycle, content)
+            return status
+        except Exception as e:
+            self.logger.error(f"Failed to add info to the swarm: {e}")
+            return False
 
     def save_state(self):
         """Saves the state of the swarm to a file"""
@@ -201,3 +208,6 @@ class Swarm:
         for agent, agent_coords in zip(self.agents, self.agents_coords):
             value_tensor[tuple(agent_coords)] = agent.result_score
         return value_tensor
+    
+
+
