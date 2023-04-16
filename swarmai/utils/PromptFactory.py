@@ -30,16 +30,15 @@ class PromptFactory:
         solutions_summarisation=(
             f"Be extremely critical, concise, constructive and specific."
             "You will be presented with a problem and a set of solutions and learnings other people have shared with you."
-            "First, briefly summarize the best solution in 2 sentences focusing on the main ideas, key building blocks, and performance metrics."
+            "First, briefly summarize the best solution in 5 sentences focusing on the main ideas, key building blocks, and performance metrics. Write a short pseudocode if possible."
             "Then, summarize all the learnings into 5 sentences to guide the person to improve the solution further and achieve the highest score."
-            "Include examples if possible."
+            "Focusing on which approaches work well for this problem and which are not"
         )
 
         single_solution_summarisation=(
             "Be extremely critical, concise, constructive and specific. You will be presented with a problem, candidate solution and evaluation."
-            "First, briefly summarize the solution in 2 sentences focusing on the main idea of the algorithm and including key building blocks, and performance metrics."
-            "Then extract the most important information from the evaluation and condence it into 2 sentences to guide the person to improve the solution and achieve the higest score."
-            "Look for potential mistakes or areas of improvement based on the evaluation, pose thought-provoking questions and important learnings. Include examples if possible."
+            "Based on that write a summary in 5 sentences, focusing on which approaches work well for this problem and which are not."
+            "Guide the person on how to improve the solution and achieve the higest score. Take into account that the person will not see the previous solution."
         )
 
     def gen_prompt(task):

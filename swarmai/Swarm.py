@@ -1,7 +1,8 @@
 import numpy as np
-import logging
+import os
 import threading
 from datetime import datetime
+import time
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -71,21 +72,35 @@ class Swarm:
         self.agents_ids = []
         self.agents = self._create_agents() # returns just a list of agents
         self.agents_coords = self._create_connectivity_matrix() # returns a matrix of agent coordinates
+        self.assign_neighbours()
 
         # some other attributes
         self.current_cycle = 0
         self.best_score = 0
         self.best_answer = ''
 
-    def run_swarm(self, n_cycles):
+    def run_swarm(self, max_sec=10):
         """Runs the swarm for a given number of cycles or until the termination condition is met.
         """
         for agent in self.agents:
-            agent.max_cycles = n_cycles
+            agent.max_cycles = 500
+            agent.name = f"Agent {agent.agent_id}" # inherited from threading.Thread => thread name
             self.log(f"Starting agent {agent.agent_id} with role {agent.agent_role}")
             agent.start()
+
+        time.sleep(max_sec)
+        for agent in self.agents:
+            agent.ifRun = False
+
         for agent in self.agents:
             agent.join()
+
+        self.log("All agents have finished their work")
+        
+        # finish execution
+        self.log(f"Best score: {self.best_score}")
+        self.log(f"Best answer: {self.best_answer}")
+
 
     def _create_agents(self):
         """Creates the tesnor of agents according to the tensor shape and the agent role distribution.
@@ -106,10 +121,11 @@ class Swarm:
         agents = []
         for id, agent_role in enumerate(agent_roles_n):
             agent_id = id
-            agents.append(self.WORKER_ROLES[agent_role](agent_id, agent_role, self, self.shared_memory, self.challenge, self.logger))
+            challenge_i = PythonChallenge(self.challenge.config_file_loc)
+            # need each agent to have its own challenge instance, because sometimes the agens submit the answers with infinite loops
+            # also included a timeout for the agent's computation in the AgentBase class
+            agents.append(self.WORKER_ROLES[agent_role](agent_id, agent_role, self, self.shared_memory, challenge_i, self.logger))
             self.agents_ids.append(agent_id)
-
-        np.random.shuffle(agents)
 
         self.log(f"Created {len(agents)} agents with roles: {agent_roles_n}")
           
@@ -121,16 +137,28 @@ class Swarm:
         """
         agents_roles = np.array([a.agent_role[0] for a in self.agents]).reshape(self.agents_tensor_shape)
         self.log(f"Agents roles:\n{agents_roles}")
+
         return np.array(np.unravel_index(np.arange(np.prod(self.agents_tensor_shape)), self.agents_tensor_shape)).T
 
     def get_neighbours(self, agent_id):
         """For now just returning the coordinates of the ajacent nodes in the tensor.
         """
         agent_coords = self.agents_coords[self.agents_ids.index(agent_id)]
-        distances = np.sum(np.abs(self.agents_coords - agent_coords), axis=1)
-        neighbours = self.agents[distances <= 1] # inlcuding the agent itself, that's correct => self-memory
+        distances = np.linalg.norm(self.agents_coords - agent_coords, axis=1)
+        neighbour_ids = np.where(distances <= 1)[0]
+        neighbours = self.agents[neighbour_ids] # inlcuding the agent itself, that's correct => self-memory
         return neighbours
     
+    def assign_neighbours(self):
+        """Assigns the neighbours to each agent.
+        What needs to be done is actually the assignment of the message queues.
+        """
+        self.log("Assigning neighbours")
+        for agent in self.agents:
+            neighbours = self.get_neighbours(agent.agent_id)
+            for neighbour in neighbours:
+                agent.add_neighbour(neighbour)
+
     def iterate_cycle(self):
         # Start the agents
         for agent in self.agents:
@@ -159,6 +187,14 @@ class Swarm:
             agent_id = agent.agent_id
             agent_cycle = agent.cycle
             status = self.shared_memory.add_entry(score, agent_id, agent_cycle, content)
+
+            # update the best score
+            if score > self.best_score:
+                self.best_score = score
+                self.best_answer = content
+            
+            self.log(f"SOLSOL: Best solution so far: {self.best_score:.2f}")
+
             return status
         except Exception as e:
             self.log(f"Failed to add info {data} to the swarm: {e}", level="error")

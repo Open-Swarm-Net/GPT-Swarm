@@ -6,6 +6,28 @@ import time
 from swarmai.challenges.python_challenges.PythonChallengeSolutionBase import PythonChallengeSolutionBase
 
 class Solution(PythonChallengeSolutionBase):
+    def __init__(self, n_tests=11000):
+        super().__init__()
+        default_cases = [
+            "a",
+            "aA1",
+            "1337C0d3",
+            "aaa123",
+            "aaa111",
+            "ssSsss",
+            "ABABABABABABABABABAB1",
+            "bbaaaaaaaaaaaaaaacccccc",
+            "aaaaAAAAAA000000123456",
+            "aaaabbbbccccddeeddeeddeedd",
+            "FFFFFFFFFFFFFFF11111111111111111111AAA",
+            "A1234567890aaabbbbccccc"
+        ]
+        self.random_seed = 42
+        random.seed(self.random_seed)
+        self.test_cases = default_cases*int(n_tests/(len(default_cases)*2)) + [self.gen_random_input() for _ in range(int(n_tests/2))]
+        if self.test_cases[-1] == self.test_cases[-2]:
+            raise ValueError("Test cases are not random enough")
+        
     def strongPasswordChecker(self, s: str) -> int:
         """
         :type s: str
@@ -89,26 +111,13 @@ class Solution(PythonChallengeSolutionBase):
 
         return password
 
-    def evaluate_solution(self, test_func, n_tests=10):
+    def evaluate_solution(self, test_func, n_tests=1000):
         """Evaluates whatever you want. The evaluation function is absolutely flexible.
         """
-        default_cases = [
-            "a",
-            "aA1",
-            "1337C0d3",
-            "aaa123",
-            "aaa111",
-            "ssSsss",
-            "ABABABABABABABABABAB1",
-            "bbaaaaaaaaaaaaaaacccccc",
-            "aaaaAAAAAA000000123456",
-            "aaaabbbbccccddeeddeeddeedd",
-            "FFFFFFFFFFFFFFF11111111111111111111AAA",
-            "A1234567890aaabbbbccccc"
-        ]
-        test_cases = default_cases*int(n_tests/(len(default_cases)*2)) + [self.gen_random_input() for _ in range(int(n_tests/2))]
         correct_solutions = []
         test_solutions = []
+
+        test_cases = self.test_cases[:n_tests]
 
         # create ideal solutions and also time it
         tick = time.time()
@@ -140,41 +149,18 @@ class Solution(PythonChallengeSolutionBase):
             else:
                 correct_list.append(False)
         
-        correctness_score = correct / len(test_cases)
-        if ideal_time == 0 and test_time == 0:
-            runtime_score = 1
-        elif ideal_time == 0:
-            ideal_time = test_time / 2
-            runtime_score =  ideal_time / test_time
-        elif test_time == 0:
-            runtime_score = 1
+        score = correct / len(test_cases)
+
+        evaluations = f"Total score: {score:.3f}; {score*100:.2f}% test cases are solved correctly;"
+        if score == 1:
+            evaluations += "\n All test cases are solved correctly."
         else:
-            runtime_score =  ideal_time / test_time
-
-        if runtime_score > 1.5:
-            runtime_score = 1.5
-
-        if correctness_score <= 1 and runtime_score <= 1:
-            score = pow(correctness_score, 2)*pow(runtime_score, 1)
-        elif correctness_score < 1 and runtime_score > 1:
-            score = correctness_score
-        elif correctness_score >=1:
-            score = correctness_score*runtime_score
-
-        if score >= 1:
-            score = 1
-            evaluations = f"Everything is correct. \n Runtime: {test_time*1000:.3f}ms"
-        else:
-            evaluations = f"Total score: {score:.3f}; {correctness_score*100:.2f}% test cases are solved correctly; \n Runtime: {test_time*1000:.3f}ms, which is {1/runtime_score:.3f} times slower than the ideal solution."
-            if correctness_score == 1:
-                evaluations += "\n All test cases are solved correctly, but the runtime is too slow."
-            else:
-                evaluations += "\n Some test cases are solved incorrectly. Examples: \n"
-                false_ids = [i for i, x in enumerate(correct_list) if x == False]
-                n_examples = 5
-                false_ids = random.sample(false_ids, min(n_examples, len(false_ids)))
-                for false_id in false_ids:
-                    evaluations += f"Input: {test_cases[false_id]}\nResult: {test_solutions[false_id]}\nExpected: {correct_solutions[false_id]}\nCorrect: {False}\n"
+            evaluations += "\n Some test cases are solved incorrectly. Examples: \n"
+            false_ids = [i for i, x in enumerate(correct_list) if x == False]
+            n_examples = 5
+            false_ids = random.sample(false_ids, min(n_examples, len(false_ids)))
+            for false_id in false_ids:
+                evaluations += f"Input: {test_cases[false_id]}\nResult: {test_solutions[false_id]}\nExpected: {correct_solutions[false_id]}\nCorrect: {False}\n"
         return score, evaluations
 
         

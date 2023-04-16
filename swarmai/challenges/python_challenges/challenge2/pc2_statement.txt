@@ -4,12 +4,12 @@ A password is considered strong if the below conditions are all met:
 - It does not contain three repeating characters in a row (i.e., "Baaabb0" is weak, but "Baaba0" is strong).
 
 Given a string password, return the minimum number of steps required to make password strong. if password is already strong, return 0.
+Ignore time and space complexity and focus on solving the problem. Also ignore human readability and comments.
 
 In one step, you can:
 - Insert one character to password,
 - Delete one character from password, or
 - Replace one character of password with another character.
- 
 
 Example 1:
 Input: password = "a"

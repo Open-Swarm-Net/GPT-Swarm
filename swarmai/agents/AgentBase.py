@@ -57,11 +57,11 @@ class AgentBase(ABC, threading.Thread):
     def run(self):
         while self.ifRun:
             self.job = AgentJob(self.agent_iteration, ())
+            self.job.name = f"Agent {self.agent_id}, cycle {self.cycle}"
             self.job.start()
-            self.job.join(timeout = 60) # unfortunately need to have a timeout to avoid deadlocks for now.
+            self.job.join(timeout = 120)
 
-            # TODO: need to find a deadlock (╯°□°）╯︵ ┻━┻). crappy hack ahead
-            # reinstantiating the challenge object that got locked. Currently the problem is in python challenge
+            # there is no deadlock, but the agetns sometimes submit code with infinite loops, so need to kill the jobs
             if self.job.is_alive():
                 self.log("Stuck. Restarting the challenge object.", level = "error")
                 challenge_config = self.challenge.config_file_loc
@@ -98,10 +98,17 @@ class AgentBase(ABC, threading.Thread):
     def _retrive_messages(self):
         """Retrive messages from the neighbors.
         """
-        for queue in self.neighbor_queues:
-            if not queue.empty():
-                message = queue.get()
-                self.process_message(message)
+        # can't use .qsize of .empty() because they are not reliable
+        queue_full = True
+        while queue_full:
+            try:
+                message = self.message_queue.get(timeout=0.1)
+                self._process_message(message)
+                self.message_queue.task_done()
+            except queue.Empty:
+                queue_full = False
+            except Exception as e:
+                self.log(f"Error while processing the message: {e}", level = "error")
 
     def _process_message(self, message):
         """Process the message from the neighbor.
@@ -109,7 +116,7 @@ class AgentBase(ABC, threading.Thread):
         Args:
             message (dict): The message from the neighbor.
         """
-        self.logger.debug(f"Agent {self.agent_id} received message: {message}")
+        self.log(f"Received message: {message}", level="debug")
         self.internal_memory.add_entry(message["score"], message["content"])
     
     def _send_data_to_neighbors(self, data):
@@ -130,6 +137,15 @@ class AgentBase(ABC, threading.Thread):
         """
         self.log(f"To shared memory: {data}", level = "debug")
         _ = self.swarm.add_shared_info(self, data) # the lock is set in the swarm
+
+    def add_neighbour(self, neighbour_agent):
+        """Add a neighbor to the agent.
+
+        Args:
+            queue (Queue): The queue to communicate with the neighbor.
+        """
+        self.log(f"Added neighbour: {neighbour_agent.agent_id}", level = "debug")
+        self.neighbor_queues.append(neighbour_agent.message_queue)
 
     def reset(self):
         # Reset the necessary internal state while preserving memory

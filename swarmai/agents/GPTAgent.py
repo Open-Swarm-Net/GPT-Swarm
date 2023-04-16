@@ -33,7 +33,7 @@ class GPTAgent(AgentBase):
         openai.api_key = os.getenv("OPENAI_API_KEY")
         self.model_name = "gpt-3.5-turbo"
         self.max_response_tokens = 1500
-        self.temperature = 0.1
+        self.temperature = 0.2
 
         # some other parameters
         self.result = ''
@@ -41,11 +41,19 @@ class GPTAgent(AgentBase):
         self.evaluation = ''
         self.role_prompt = f"Act as a professional {self.agent_role}.\n"
 
+    def _reset(self):
+        """Reset the agent to its initial state.
+        """
+        self.result = ''
+        self.result_score = 0
+        self.evaluation = ''
+
     def perform_task(self):
         """main method of the agent that defines the task it performs.
         Executed in the abstract class.
         """
         self.current_step = "perform_task"
+        self._reset()
         cycle_prompt = ''
 
         self.log(f"Performing the task")
@@ -65,6 +73,7 @@ class GPTAgent(AgentBase):
 
         result = self.call_model(conversation)
         self.result = result
+        self.log(f"Result: {self.result}", level="debug")
 
         # evaluate the result
         self.result_score, self.evaluation = self._self_evaluate()
@@ -76,8 +85,13 @@ class GPTAgent(AgentBase):
         Executed in the abstract class.
         """
         self.current_step = "share"
-        self._send_data_to_neighbors({"score": self.result_score, "content": self.result + "\n" + self.evaluation})
-        self._send_data_to_swarm({"score": self.result_score, "content": self.result + "\n" + self.evaluation})
+        if self.result_score > 0:
+            self._send_data_to_neighbors({"score": self.result_score, "content": f"*Potential solution:*\n{self.result} \n\n*Evaluation:*\n{self.evaluation}"})
+            #self._send_data_to_swarm({"score": self.result_score, "content": f"*Potential solution:*\n{self.result} \n\n*Evaluation:*\n{self.evaluation}"})
+            #self._send_data_to_neighbors({"score": self.result_score, "content": self.evaluation})
+            self._send_data_to_swarm({"score": self.result_score, "content": self.evaluation})
+        else:
+            self.log("Result score is 0, not sharing the result.")
     
     def truncate_message(self, message, max_tokens):
         """Truncate a message to a maximum number of tokens.
@@ -131,8 +145,11 @@ class GPTAgent(AgentBase):
                 raise ValueError("Conversation messages must have a format: {'role': 'user', 'content': 'message'}. 'role' is missing.")
             if "content" not in message:
                 raise ValueError("Conversation messages must have a format: {'role': 'user', 'content': 'message'}. 'content' is missing.")
-            
-        response = openai.ChatCompletion.create(model=self.model_name, messages=conversation, max_tokens=max_tokens, temperature=temperature, n=1)
+        
+        try:
+            response = openai.ChatCompletion.create(model=self.model_name, messages=conversation, max_tokens=max_tokens, temperature=temperature, n=1)
+        except:
+            return ""
         return response["choices"][0]["message"]["content"]
     
     def _self_evaluate(self):
@@ -142,7 +159,7 @@ class GPTAgent(AgentBase):
         """
         self.current_step = "self_evaluate"
         try:
-            score, evaluation = self.challenge.evaluate_solution(self.result, num_test_cases=2000)
+            score, evaluation = self.challenge.evaluate_solution(self.result, num_test_cases=10000)
         except Exception as e:
             self.log(f"Failed to run the solution.", level="error")
             self.log(e, level="error")
@@ -173,9 +190,12 @@ class GPTAgent(AgentBase):
         config_prompt = self.role_prompt + PromptFactory.StandardPrompts.solutions_summarisation
 
         if self.internal_memory.len() > 0:
-            best_solution = self.internal_memory.get_top_n(n=1)
+            best_solution = self.internal_memory.get_top_n(n=1)[0][1]
+            best_solution = f"*Score:*{best_solution['score']}\n*Content:*\n{best_solution['content']}"
 
-            learnings = [x["content"] for x in self.internal_memory]
+            contents = self.internal_memory.data # dict = {"key": {"score": score, "content": content}, ...}
+
+            learnings = [x["content"].split("\n\n*Evaluation:*\n")[-1] for x in contents.values()]
             learnings = "\n\n".join(learnings)
 
             content_prompt = f"Best potential solution so far:\n{best_solution} \n\n Learnings: \n{learnings} \n\n"
