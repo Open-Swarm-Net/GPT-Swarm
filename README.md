@@ -72,6 +72,15 @@ Then as usual `pip install -r requirements.txt` and you are ready to go.
 # Documentation
 tbd
 
+# Docker
+
+Build Multi-Arch image:
+
+```shell
+docker buildx build --platform linux/amd64,linux/arm64 --tag gpt-swarm/gpt-swarm:0.0.0 .
+```
+
+
 # How to Contribute
 
 - follow the SOLID principles and don't break the abstractions
