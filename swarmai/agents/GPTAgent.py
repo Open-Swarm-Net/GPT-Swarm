@@ -13,18 +13,18 @@ class GPTAgent(AgentBase):
     - Implements the threading. Thread class to allow the swarm to run in parallel.
     """
 
-    def __init__(self, agent_id, agent_role, swarm, shared_memory, challenge, logger):
+    def __init__(self, agent_id, agent_type, swarm, shared_memory, challenge, logger):
         """Initialize the agent.
         
         Args:
-            agent_role (str): The type of the agent, ex. worker, explorer, evaluator, etc.
+            agent_type (str): The type of the agent, ex. worker, explorer, evaluator, etc.
             swarm (Swarm): The swarm object.
             shared_memory (SharedMemoryBase implementation): The shared memory object.
             neighbor_queues (lsit): The queues to communicate with the neighbors.
             challenge (Challenge implementation): The challenge object.
             logger (Logger): The logger object.
         """
-        super().__init__(agent_id, agent_role, swarm, shared_memory, challenge, logger)
+        super().__init__(agent_id, agent_type, swarm, shared_memory, challenge, logger)
 
         # some mandatory components
         self.internal_memory = DictInternalMemory(4)
@@ -39,7 +39,7 @@ class GPTAgent(AgentBase):
         self.result = ''
         self.result_score = 0
         self.evaluation = ''
-        self.role_prompt = f"Act as a professional {self.agent_role}.\n"
+        self.role_prompt = f"Act as a professional {self.agent_type}.\n"
 
     def _reset(self):
         """Reset the agent to its initial state.
@@ -213,7 +213,7 @@ class GPTAgent(AgentBase):
 
 
 class ExplorerGPT(GPTAgent):
-    def __init__(self, agent_id, agent_role, swarm, shared_memory, challenge, logger):
-        super().__init__(agent_id, agent_role, swarm, shared_memory, challenge, logger)
+    def __init__(self, agent_id, agent_type, swarm, shared_memory, challenge, logger):
+        super().__init__(agent_id, agent_type, swarm, shared_memory, challenge, logger)
 
         self.temperature = 0.5

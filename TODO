@@ -1,14 +1,12 @@
 Todo:
-
-- ^ find a good challenge that showcases the capabilities
-
-- shared memory
-- try adding auto-gpt to the swarm
-- multithreading => multiprocessing for performance reasons. Actually, i'd rather change the evaluation function
+- find a good challenge that showcases the capabilities
+- Task queue
+- remove (or just not use) the concept of neighbours => substitute with shared memory
+- shared memory as a vector database
+- add logger to the task queue
 
 Bugs:
-- sometimes a deadlock (or thread crash) in the PythonChallenge during evaluate_solution
-=> the problem is actually not in the deadlock. Multithreaded code evaluation is simply too much for a single CPU core
+
 
 Done:
 - prompt factory

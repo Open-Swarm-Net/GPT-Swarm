@@ -17,27 +17,27 @@ class AgentJob(threading.Thread):
 
 class AgentBase(ABC, threading.Thread):
     """Abstract base class for agents in the swarm.
-    
     - Agents are the entities that perform the task in the swarm.
     - Agents can have different roles and implementations, but they all need to implement a set of methods that would allow them to work together in a swarm.
     - Implements the threading. Thread class to allow the swarm to run in parallel.
+        
+    Attributes:
+        agent_id (int): The unique identifier of the agent
+        agent_type (str): The type of the agent, ex. worker, explorer, evaluator, etc.
+        swarm (Swarm): The swarm object
+        shared_memory (SharedMemoryBase implementation): The shared memory object
+        challenge (Challenge implementation): The challenge object
+        logger (Logger): The logger object
+        max_cycles (int): The maximum number of cycles that the agent will run
     """
 
-    def __init__(self, agent_id, agent_role, swarm, shared_memory, challenge, logger, max_cycles = 10):
+    def __init__(self, agent_id, agent_type, swarm, shared_memory, challenge, logger, max_cycles = 10):
         """Initialize the agent.
-        
-        Args:
-            agent_type (str): The type of the agent, ex. worker, explorer, evaluator, etc.
-            swarm (Swarm): The swarm object.
-            shared_memory (SharedMemoryBase implementation): The shared memory object.
-            neighbor_queues (lsit): The queues to communicate with the neighbors.
-            challenge (Challenge implementation): The challenge object.
-            logger (Logger): The logger object.
         """
         threading.Thread.__init__(self)
         ABC.__init__(self)
         self.agent_id = agent_id
-        self.agent_role = agent_role
+        self.agent_type = agent_type
         self.swarm = swarm
         self.shared_memory = shared_memory
         self.challenge = challenge
