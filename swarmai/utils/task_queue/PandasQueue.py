@@ -90,6 +90,26 @@ class PandasQueue(TaskQueueBase):
         self.tasks = pd.concat([self.tasks, df_i], ignore_index=True)
 
         return task_obj
+    
+    def complete_task(self, task_id):
+        """Completes the task with the given task_id.
+        """
+        task = self.tasks[self.tasks["task_id"] == task_id]
+        if len(task) == 0:
+            """In case task was deleted from the queue"""
+            return False
+
+        task = task.iloc[0]
+
+        if task["status"] != "in progress":
+            return False
+
+        status = "completed"
+        complete_time = datetime.now()
+        df_i = pd.DataFrame([[task["task_id"], task["priority"], task["task_type"], task["task_description"], status, task["add_time"], task["claim_time"], complete_time, task["claim_agent_id"]]], columns=self.columns)
+        self.tasks = self.tasks[self.tasks["task_id"] != task["task_id"]]
+        self.tasks = pd.concat([self.tasks, df_i], ignore_index=True)
+        return True
 
     def _get_supported_tasks(self, agent_type):
         """Returns a list of supported tasks for a given agent type.
