@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 import threading
 import queue
+from time import time
 
-from swarmai.challenges.python_challenges.PythonChallenge import PythonChallenge
+from swarmai.utils.task_queue.Task import Task
+from swarmai.utils.task_queue.TaskQueueBase import TaskQueueBase
 
 class AgentJob(threading.Thread):
     """A class that handles multithreading logic
@@ -31,7 +33,7 @@ class AgentBase(ABC, threading.Thread):
         max_cycles (int): The maximum number of cycles that the agent will run
     """
 
-    def __init__(self, agent_id, agent_type, swarm, shared_memory, challenge, logger, max_cycles = 10):
+    def __init__(self, agent_id, agent_type, swarm, logger, max_cycles = 10):
         """Initialize the agent.
         """
         threading.Thread.__init__(self)
@@ -39,23 +41,28 @@ class AgentBase(ABC, threading.Thread):
         self.agent_id = agent_id
         self.agent_type = agent_type
         self.swarm = swarm
-        self.shared_memory = shared_memory
-        self.challenge = challenge
+        self.shared_memory = self.swarm.shared_memory
+        self.task_queue = self.swarm.task_queue
+
         self.logger = logger
         self.max_cycles = max_cycles
 
         # some mandatory components
+        self.task = None
+        self.result = None
         self.internal_memory = None
-        self.neighbor_queues = []
         self.message_queue = queue.Queue()
         self.current_step = "init"
         self.ifRun = True
         self.cycle = 0
-        
-        self.global_task = self.challenge.get_problem()
 
     def run(self):
         while self.ifRun:
+            while self.task is None:
+                self._get_task() # gets the task from the task queue
+                if self.task is None:
+                    time.sleep(10)
+
             self.job = AgentJob(self.agent_iteration, ())
             self.job.name = f"Agent {self.agent_id}, cycle {self.cycle}"
             self.job.start()
@@ -63,20 +70,18 @@ class AgentBase(ABC, threading.Thread):
 
             # there is no deadlock, but the agetns sometimes submit code with infinite loops, so need to kill the jobs
             if self.job.is_alive():
-                self.log("Stuck. Restarting the challenge object.", level = "error")
-                challenge_config = self.challenge.config_file_loc
-                self.challenge = PythonChallenge(challenge_config)
+                self.log("Stuck. Dropping the thread.", level = "error")
 
             self.cycle += 1
+            self.task = None
             if self.cycle >= self.max_cycles:
                 self.ifRun = False
 
     def agent_iteration(self):
         """Main iteration of the agent.
         """
-        self._retrive_messages()
         self.perform_task()
-        self.share()
+        self.share() # submitting "task done" should be in there
 
     def terminate(self):
         """Terminate the agent
@@ -91,7 +96,7 @@ class AgentBase(ABC, threading.Thread):
     
     @abstractmethod
     def share(self):
-        """Main method of the agent that defines how it shares its results with the neighbors
+        """Main method of the agent that defines how it shares its results with the shared memory and the task queue
         """
         raise NotImplementedError
     
@@ -109,6 +114,22 @@ class AgentBase(ABC, threading.Thread):
                 queue_full = False
             except Exception as e:
                 self.log(f"Error while processing the message: {e}", level = "error")
+
+    def _get_task(self):
+        """Gets the task from the task queue.
+        It's not the job of the agent to decide which task to perform, it's the job of the task queue.
+        """
+        if not isinstance(self.task_queue, TaskQueueBase):
+            raise ValueError("The task queue is not a TaskQueueBase implementation.")
+        
+        task = self.task_queue.get_task(self)
+        if task is None:
+            return None
+
+        if not isinstance(task, Task):
+            raise ValueError("The task is not a Task implementation.")
+        
+        self.task = task
 
     def _process_message(self, message):
         """Process the message from the neighbor.

@@ -8,27 +8,32 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 
-from swarmai.utils.memory.DictSharedMemory import DictSharedMemory
 from swarmai.agents.GPTAgent import GPTAgent
 from swarmai.agents.GPTAgent import ExplorerGPT
 from swarmai.utils.CustomLogger import CustomLogger
-from swarmai.challenges.python_challenges.PythonChallenge import PythonChallenge
+
+from swarmai.utils.memory.DictSharedMemory import DictSharedMemory
+from swarmai.utils.task_queue.PandasQueue import PandasQueue
+from swarmai.utils.task_queue.Task import Task
+
+from swarmai.agents.ManagerAgent import ManagerAgent
 
 class Swarm:
     """This class is responsible for managing the swarm of agents.
 
     The logic:
-        1. The swarm gets a problem to solve and a reward function. The goal of the swarm is to maximize the reward.
-        2. The swarm consists of agents that are connected in a tensor (for now). Nuber of neighbours is defined by the dimentionality of a tensor. Agent can ask the swarm for its neighbours.
+        1. User submits a problem to the swarm
+        2. The swarm consists of agents, shared memory and a task queue.
         3. Agents have different roles.
-        4. The computation is performed in cycles (for now). Each cycle is a step in the swarm. Cycles can have different purposes like computing, sharing, evaluating, etc. that define the agents' behaviour in the cycle.
+        4. Manager agents are responsible for creating tasks and assigning them to the task queue.
         5. The swarm has a shared memory that the agents can query.
 
-    The tasks of the swamr class are:
-        1. Create and store the agents.
-        2. Identify the connectivity matrix between agents and return the neighbours of each agent.
-        3. Provide the agents with the access to the shared memory.
-        4. Iterate the computational cycles and terminate the swarm when the goal is reached or the swarm is stuck.
+    The tasks of the swarm class are:
+        1. Create and store the agents
+        2. Start the swarm
+        3. Provide the agents with the access to the shared memory and the task queue
+        4. Maintain stuck agents
+        5. Logging
 
     Swarm tips (to be extanded as we gather more experience):
         1. To avoid the swarm being stuck in a local maximum, the swarm should include agents with high and low exploration rates (models temperature).
@@ -36,25 +41,37 @@ class Swarm:
         3. The swarm architecture should have enough flexibility to allow for an emerging behaviour of the swarm (greater than the sum of its parts).
 
     TODO:
-        - adaptation algorithm
+        - adaptation algorithm (dynamically change the number of agents and their roles)
         - vector database for the shared memory
     """
 
     WORKER_ROLES = {
-        "python developer": GPTAgent,
-        "explorer python": ExplorerGPT,
+        "manager": ManagerAgent,
+        "googler": ExplorerGPT,
+        "analyst": GPTAgent,
     }
 
-    def __init__(self, challenge, agents_tensor_shape, agent_role_distribution):
+    TASK_TYPES = [
+        Task.TaskTypes.synthesis,
+        Task.TaskTypes.breakdown_to_subtasks,
+        Task.TaskTypes.google_search,
+        Task.TaskTypes.analysis
+    ]
+
+    TASK_ASSOCIATIONS = {
+        "manager": [Task.TaskTypes.synthesis, Task.TaskTypes.breakdown_to_subtasks],
+        "googler": [Task.TaskTypes.google_search],
+        "analyst": [Task.TaskTypes.analysis]
+    }
+
+    def __init__(self, n_agents, agent_role_distribution):
         """Initializes the swarm.
 
         Args:
-            challenge (implementation of ChallengeBase): The problem to solve.
-            agents_tensor_shape (tuple): The shape of the tensor that defines the connectivity between agents.
-            agent_role_distribution (dict): The weight of each role in the swarm.
+            n_agents (int): The number of agents in the swarm
+            agent_role_distribution (dict): The dictionary that maps the agent roles to the weight of agents with that role
         """
-        self.challenge = challenge
-        self.agents_tensor_shape = agents_tensor_shape
+        self.n_agents = n_agents
         self.agent_role_distribution = agent_role_distribution
 
         self.data_dir = Path(__file__).parent.parent.resolve() / "runs" / f"run_{self.challenge.problem_name.lower().replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
@@ -63,7 +80,9 @@ class Swarm:
         # creating shared memory
         self.shared_memory_file = self.data_dir / 'shared_memory.json'
         self.shared_memory = DictSharedMemory(self.shared_memory_file)
-        self.lock = threading.Lock() # need this one to accept shared memory updates from multiple threads
+
+        # creating task queue
+        self.task_queue = PandasQueue(self.TASK_TYPES, self.WORKER_ROLES.keys(), self.TASK_ASSOCIATIONS)
 
         # creating the logger
         self.logger = CustomLogger(self.data_dir)
@@ -71,8 +90,6 @@ class Swarm:
         # creating agents
         self.agents_ids = []
         self.agents = self._create_agents() # returns just a list of agents
-        self.agents_coords = self._create_connectivity_matrix() # returns a matrix of agent coordinates
-        self.assign_neighbours()
 
         # some other attributes
         self.current_cycle = 0
@@ -121,43 +138,14 @@ class Swarm:
         agents = []
         for id, agent_role in enumerate(agent_roles_n):
             agent_id = id
-            challenge_i = PythonChallenge(self.challenge.config_file_loc)
             # need each agent to have its own challenge instance, because sometimes the agens submit the answers with infinite loops
             # also included a timeout for the agent's computation in the AgentBase class
-            agents.append(self.WORKER_ROLES[agent_role](agent_id, agent_role, self, self.shared_memory, challenge_i, self.logger))
+            agents.append(self.WORKER_ROLES[agent_role](agent_id, agent_role, self, self.logger))
             self.agents_ids.append(agent_id)
 
         self.log(f"Created {len(agents)} agents with roles: {agent_roles_n}")
           
         return np.array(agents)
-    
-    def _create_connectivity_matrix(self):
-        """Creates the coordinates of each agent in the tensor.
-        For now just creating a list of coordinates of the same shape as self.agents
-        """
-        agents_roles = np.array([a.agent_role[0] for a in self.agents]).reshape(self.agents_tensor_shape)
-        self.log(f"Agents roles:\n{agents_roles}")
-
-        return np.array(np.unravel_index(np.arange(np.prod(self.agents_tensor_shape)), self.agents_tensor_shape)).T
-
-    def get_neighbours(self, agent_id):
-        """For now just returning the coordinates of the ajacent nodes in the tensor.
-        """
-        agent_coords = self.agents_coords[self.agents_ids.index(agent_id)]
-        distances = np.linalg.norm(self.agents_coords - agent_coords, axis=1)
-        neighbour_ids = np.where(distances <= 1)[0]
-        neighbours = self.agents[neighbour_ids] # inlcuding the agent itself, that's correct => self-memory
-        return neighbours
-    
-    def assign_neighbours(self):
-        """Assigns the neighbours to each agent.
-        What needs to be done is actually the assignment of the message queues.
-        """
-        self.log("Assigning neighbours")
-        for agent in self.agents:
-            neighbours = self.get_neighbours(agent.agent_id)
-            for neighbour in neighbours:
-                agent.add_neighbour(neighbour)
 
     def iterate_cycle(self):
         # Start the agents
@@ -166,10 +154,6 @@ class Swarm:
         
         for agent in self.agents:
             agent.job.join(timeout = 60)
-            
-        # TODO: need to find a deadlock (╯°□°）╯︵ ┻━┻). crappy hack ahead
-        challenge_config = self.challenge.config_file_loc
-        self.challenge = PythonChallenge(challenge_config)
 
         # Save the state
         self.save_state()
@@ -199,28 +183,6 @@ class Swarm:
         except Exception as e:
             self.log(f"Failed to add info {data} to the swarm: {e}", level="error")
             return False
-
-    def save_state(self):
-        """Saves the state of the swarm to a file"""
-        
-        # TODO: implement the state from which to resume the swarm
-
-        # save a figure that presents the swarm performance
-        fig = plt.figure(figsize=(5, 5))
-        value_tensor = self.get_value_tensor()
-        best_score = self.best_score
-        sns.heatmap(value_tensor, annot=True, cbar=True, cmap="YlGnBu", vmin=0, vmax=1)
-        plt.title(f"{self.current_cycle} => History best: {best_score:.2f}; Step average {np.mean(value_tensor):.2f}")
-        fig_name = f"swarm_state_{self.current_cycle}.png"
-        fig_path = Path(self.logger.log_folder, fig_name)
-        fig.savefig(fig_path)
-        plt.close(fig)
-
-    def get_value_tensor(self):
-        value_tensor = np.zeros(self.agents_tensor_shape)
-        for agent, agent_coords in zip(self.agents, self.agents_coords):
-            value_tensor[tuple(agent_coords)] = agent.result_score
-        return value_tensor
     
     def log(self, message, level="info"):
         level = level.lower()

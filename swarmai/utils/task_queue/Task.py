@@ -1,3 +1,5 @@
+import uuid
+
 class Task:
     """A simple representation of a task that is used ONLY for exchage between agents and task queues.
     Is purely a data structure, so no methods are needed. Thread-safeness must be handled in the task queue, not here.
@@ -9,7 +11,16 @@ class Task:
     - task_description: description of the task
     - status: status of the task, e.g. "pending", "in progress", "completed", "failed", 'cancelled'
     """
-    def __init__(self, task_id, priority, task_type, task_description, status):
+
+    class TaskTypes:
+        """Task types that are supported by the task queue
+        """
+        google_search = "google_search"
+        breakdown_to_subtasks = "breakdown_to_subtasks"
+        synthesis = "synthesis"
+        analysis = "analysis"
+
+    def __init__(self, priority, task_type, task_description, status="pending", task_id=uuid.uuid4()):
         self.task_id = task_id
         self.priority = priority
         self.task_type = task_type

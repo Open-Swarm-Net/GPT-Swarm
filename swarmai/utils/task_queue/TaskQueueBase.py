@@ -2,6 +2,7 @@ import threading
 from abc import ABC, abstractmethod
 
 from swarmai.utils.task_queue.Task import Task
+from swarmai.agents.AgentBase import AgentBase
 
 def synchronized_queue(method):
     timeout_sec = 30
@@ -40,7 +41,7 @@ class TaskQueueBase(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_task(self) -> Task:
+    def get_task(self, agent: AgentBase) -> Task:
         """Gets the next task from the queue.
         """
         raise NotImplementedError

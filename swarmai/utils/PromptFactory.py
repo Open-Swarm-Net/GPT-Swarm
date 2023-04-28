@@ -41,5 +41,10 @@ class PromptFactory:
             "Guide the person on how to improve the solution and achieve the higest score. Take into account that the person will not see the previous solution."
         )
 
+        task_breakdown=(
+            "Given a task and a list of possible subtask types, breakdown a general task in the list of at most 5 subtasks that would help to solve the main task."
+            "The output should be formatted in a way that is easily parsable in Python, using separators to enclose the subtask type and task description."
+        )
+
     def gen_prompt(task):
         raise NotImplementedError

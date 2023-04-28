@@ -19,9 +19,14 @@ class PandasQueue(TaskQueueBase):
     - status: status of the task, e.g. "pending", "in progress", "completed", "failed", 'cancelled'
     """
 
-    def __init__(self, task_types, agent_types, task_association):
+    def __init__(self, task_types: list, agent_types: list, task_association: dict):
         """
         Task association is a dictionary that returns a list of task_types for a given agent_type.
+
+        Attributes:
+            - task_types (list[str]): list of task types that are supported by the task queue
+            - agent_types (list[str]): list of agent types that are supported by the task queue
+            - task_association (dict): dictionary that returns a list of task_types for a given agent_type
         """
         super().__init__()
         self.columns = ["task_id", "priority", "task_type", "task_description", "status", "add_time", "claim_time", "complete_time", "claim_agent_id"]
