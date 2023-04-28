@@ -16,7 +16,7 @@ from swarmai.utils.memory.DictSharedMemory import DictSharedMemory
 from swarmai.utils.task_queue.PandasQueue import PandasQueue
 from swarmai.utils.task_queue.Task import Task
 
-from swarmai.agents.ManagerAgent import ManagerAgent
+from swarmai.agents import ManagerAgent, GeneralPurposeAgent
 
 class Swarm:
     """This class is responsible for managing the swarm of agents.
@@ -47,8 +47,8 @@ class Swarm:
 
     WORKER_ROLES = {
         "manager": ManagerAgent,
-        "googler": ExplorerGPT,
-        "analyst": GPTAgent,
+        "googler": GeneralPurposeAgent,
+        "analyst": GeneralPurposeAgent,
     }
 
     TASK_TYPES = [
@@ -59,22 +59,22 @@ class Swarm:
     ]
 
     TASK_ASSOCIATIONS = {
-        "manager": [Task.TaskTypes.synthesis, Task.TaskTypes.breakdown_to_subtasks],
-        "googler": [Task.TaskTypes.google_search],
-        "analyst": [Task.TaskTypes.analysis]
+        "manager": [Task.TaskTypes.breakdown_to_subtasks],
+        "googler": [Task.TaskTypes.synthesis, Task.TaskTypes.analysis, Task.TaskTypes.google_search],
+        "analyst": [Task.TaskTypes.synthesis, Task.TaskTypes.analysis, Task.TaskTypes.google_search]
     }
 
-    def __init__(self, n_agents, agent_role_distribution):
+    def __init__(self, agents_tensor_shape, agent_role_distribution):
         """Initializes the swarm.
 
         Args:
-            n_agents (int): The number of agents in the swarm
+            agents_tensor_shape (tuple): The number of agents in the swarm
             agent_role_distribution (dict): The dictionary that maps the agent roles to the weight of agents with that role
         """
-        self.n_agents = n_agents
+        self.agents_tensor_shape = agents_tensor_shape
         self.agent_role_distribution = agent_role_distribution
 
-        self.data_dir = Path(__file__).parent.parent.resolve() / "runs" / f"run_{self.challenge.problem_name.lower().replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        self.data_dir = Path(__file__).parent.parent.resolve() / "runs" / f"run_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         # creating shared memory
@@ -91,18 +91,24 @@ class Swarm:
         self.agents_ids = []
         self.agents = self._create_agents() # returns just a list of agents
 
-        # some other attributes
-        self.current_cycle = 0
-        self.best_score = 0
-        self.best_answer = ''
-
-    def run_swarm(self, max_sec=10):
+    def run_swarm(self, main_task, max_sec=10):
         """Runs the swarm for a given number of cycles or until the termination condition is met.
         """
+        # add the main task to the task queue
+        main_task = Task(
+            priority=0,
+            task_type=Task.TaskTypes.breakdown_to_subtasks,
+            task_description=main_task,
+        )
+        n_managers = len([agent for agent in self.agents if agent.agent_type == "manager"])
+        for _ in range(n_managers):
+            self.task_queue.add_task(main_task)
+
+        # start the agents
         for agent in self.agents:
-            agent.max_cycles = 500
+            agent.max_cycles = 50
             agent.name = f"Agent {agent.agent_id}" # inherited from threading.Thread => thread name
-            self.log(f"Starting agent {agent.agent_id} with role {agent.agent_role}")
+            self.log(f"Starting agent {agent.agent_id} with type {agent.agent_type}")
             agent.start()
 
         time.sleep(max_sec)
@@ -113,10 +119,6 @@ class Swarm:
             agent.join()
 
         self.log("All agents have finished their work")
-        
-        # finish execution
-        self.log(f"Best score: {self.best_score}")
-        self.log(f"Best answer: {self.best_answer}")
 
 
     def _create_agents(self):
@@ -147,17 +149,6 @@ class Swarm:
           
         return np.array(agents)
 
-    def iterate_cycle(self):
-        # Start the agents
-        for agent in self.agents:
-            agent.run_async()
-        
-        for agent in self.agents:
-            agent.job.join(timeout = 60)
-
-        # Save the state
-        self.save_state()
-
     def add_shared_info(self, agent, data):
         """Adds data to the shared memory
         Args:
@@ -171,13 +162,6 @@ class Swarm:
             agent_id = agent.agent_id
             agent_cycle = agent.cycle
             status = self.shared_memory.add_entry(score, agent_id, agent_cycle, content)
-
-            # update the best score
-            if score > self.best_score:
-                self.best_score = score
-                self.best_answer = content
-            
-            self.log(f"SOLSOL: Best solution so far: {self.best_score:.2f}")
 
             return status
         except Exception as e:

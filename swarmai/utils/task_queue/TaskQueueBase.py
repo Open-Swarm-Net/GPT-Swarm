@@ -28,20 +28,23 @@ class TaskQueueBase(ABC):
     def __init__(self):
         self.lock = threading.Lock()
 
-        # make sure that all the methods are subject to the decorator
-        for name in dir(self):
-            attr = getattr(self, name)
-            if callable(attr):
-                setattr(self, name, synchronized_queue(attr))
-
+    @synchronized_queue
     @abstractmethod
     def add_task(self, taks: Task) -> bool:
         """Adds a task to the queue.
         """
         raise NotImplementedError
 
+    @synchronized_queue
     @abstractmethod
     def get_task(self, agent: AgentBase) -> Task:
+        """Gets the next task from the queue.
+        """
+        raise NotImplementedError
+    
+    @synchronized_queue
+    @abstractmethod
+    def complete_task(self, task_id: str):
         """Gets the next task from the queue.
         """
         raise NotImplementedError

@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
 import threading
 import queue
-from time import time
+import time
 
 from swarmai.utils.task_queue.Task import Task
-from swarmai.utils.task_queue.TaskQueueBase import TaskQueueBase
 
 class AgentJob(threading.Thread):
     """A class that handles multithreading logic
@@ -48,6 +47,7 @@ class AgentBase(ABC, threading.Thread):
         self.max_cycles = max_cycles
 
         # some mandatory components
+        self.step = "init"
         self.task = None
         self.result = None
         self.internal_memory = None
@@ -61,7 +61,7 @@ class AgentBase(ABC, threading.Thread):
             while self.task is None:
                 self._get_task() # gets the task from the task queue
                 if self.task is None:
-                    time.sleep(10)
+                    time.sleep(15)
 
             self.job = AgentJob(self.agent_iteration, ())
             self.job.name = f"Agent {self.agent_id}, cycle {self.cycle}"
@@ -73,15 +73,17 @@ class AgentBase(ABC, threading.Thread):
                 self.log("Stuck. Dropping the thread.", level = "error")
 
             self.cycle += 1
-            self.task = None
             if self.cycle >= self.max_cycles:
                 self.ifRun = False
 
     def agent_iteration(self):
         """Main iteration of the agent.
         """
-        self.perform_task()
-        self.share() # submitting "task done" should be in there
+        ifSuccess = self.perform_task()
+        if ifSuccess:
+            self._submit_complete_task()
+            self.share()
+            self.task = None
 
     def terminate(self):
         """Terminate the agent
@@ -100,6 +102,9 @@ class AgentBase(ABC, threading.Thread):
         """
         raise NotImplementedError
     
+    def _submit_complete_task(self):
+        self.task_queue.complete_task(self.task.task_id)
+
     def _retrive_messages(self):
         """Retrive messages from the neighbors.
         """
@@ -118,12 +123,12 @@ class AgentBase(ABC, threading.Thread):
     def _get_task(self):
         """Gets the task from the task queue.
         It's not the job of the agent to decide which task to perform, it's the job of the task queue.
-        """
-        if not isinstance(self.task_queue, TaskQueueBase):
-            raise ValueError("The task queue is not a TaskQueueBase implementation.")
-        
+        """        
         task = self.task_queue.get_task(self)
-        if task is None:
+        if task is not None:
+            self.log(f"Got task: {task.task_description} of type: {task.task_type} with priority: {task.priority}" , level = "info")
+        else:
+            self.log(f"No task found. Waiting for the proper task", level = "debug")
             return None
 
         if not isinstance(task, Task):

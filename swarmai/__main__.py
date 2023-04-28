@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 sys.path.append('..')
 
-from swarmai.challenges.python_challenges.PythonChallenge import PythonChallenge
 from swarmai.Swarm import Swarm
 
 def load_keys():
@@ -13,19 +12,15 @@ def load_keys():
         keys = json.load(f)
     os.environ["OPENAI_API_KEY"] = keys["OPENAI_API_KEY"]
 
-def init_challenge():
-    # defining the challenge the swarm will be working on
-    test_challenge_config = Path(__file__).parent.parent / 'swarmai/challenges/python_challenges/challenge2/pc2_config.yaml'
-    challenge1 = PythonChallenge(test_challenge_config)
-    print(challenge1.get_problem())
-    return challenge1
-
 def run_swarm(challenge):
     # establishing the swarm
-    swarm1 = Swarm(challenge, (5, 5), {"python developer": 0.8, "explorer python": 0.2})
-    swarm1.run_swarm(15000)
+    swarm1 = Swarm((10,), {"manager": 3, "analyst": 9})
+    swarm1.run_swarm(challenge, max_sec=120)
 
 if __name__=="__main__":
+    main_task =(
+        "Act as an investement analyst. The startup described below is looking for funding. Your task is to find out as much as possible about the ideas space and startup's potential.\n"
+        "Guardrails is an open-source Python package for specifying structure and type, validating and correcting the outputs of large language models (LLMs)."
+    )
     load_keys()
-    ch = init_challenge()
-    run_swarm(ch)
+    run_swarm(main_task)
