@@ -1,18 +1,12 @@
 import numpy as np
-import os
-import threading
 from datetime import datetime
 import time
 
-import matplotlib.pyplot as plt
-import seaborn as sns
 from pathlib import Path
 
-from swarmai.agents.GPTAgent import GPTAgent
-from swarmai.agents.GPTAgent import ExplorerGPT
 from swarmai.utils.CustomLogger import CustomLogger
 
-from swarmai.utils.memory.DictSharedMemory import DictSharedMemory
+from swarmai.utils.memory import VectorMemory
 from swarmai.utils.task_queue.PandasQueue import PandasQueue
 from swarmai.utils.task_queue.Task import Task
 
@@ -52,16 +46,16 @@ class Swarm:
     }
 
     TASK_TYPES = [
-        Task.TaskTypes.synthesis,
+        Task.TaskTypes.summarisation,
         Task.TaskTypes.breakdown_to_subtasks,
         Task.TaskTypes.google_search,
         Task.TaskTypes.analysis
     ]
 
     TASK_ASSOCIATIONS = {
-        "manager": [Task.TaskTypes.breakdown_to_subtasks],
-        "googler": [Task.TaskTypes.synthesis, Task.TaskTypes.analysis, Task.TaskTypes.google_search],
-        "analyst": [Task.TaskTypes.synthesis, Task.TaskTypes.analysis, Task.TaskTypes.google_search]
+        "manager": [Task.TaskTypes.breakdown_to_subtasks, Task.TaskTypes.summarisation],
+        "googler": [Task.TaskTypes.analysis, Task.TaskTypes.google_search],
+        "analyst": [Task.TaskTypes.summarisation, Task.TaskTypes.analysis, Task.TaskTypes.google_search]
     }
 
     def __init__(self, agents_tensor_shape, agent_role_distribution):
@@ -78,8 +72,8 @@ class Swarm:
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         # creating shared memory
-        self.shared_memory_file = self.data_dir / 'shared_memory.json'
-        self.shared_memory = DictSharedMemory(self.shared_memory_file)
+        self.shared_memory_file = self.data_dir / 'shared_memory'
+        self.shared_memory = VectorMemory(self.shared_memory_file)
 
         # creating task queue
         self.task_queue = PandasQueue(self.TASK_TYPES, self.WORKER_ROLES.keys(), self.TASK_ASSOCIATIONS)
@@ -157,11 +151,8 @@ class Swarm:
         """
         # the mulithreading is handled by the shared memory
         try:
-            score = data["score"]
             content = data["content"]
-            agent_id = agent.agent_id
-            agent_cycle = agent.cycle
-            status = self.shared_memory.add_entry(score, agent_id, agent_cycle, content)
+            status = self.shared_memory.add_entry(entry=content)
 
             return status
         except Exception as e:

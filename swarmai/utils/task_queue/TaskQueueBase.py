@@ -5,7 +5,7 @@ from swarmai.utils.task_queue.Task import Task
 from swarmai.agents.AgentBase import AgentBase
 
 def synchronized_queue(method):
-    timeout_sec = 30
+    timeout_sec = 5
     def wrapper(self, *args, **kwargs):
         with self.lock:
             self.lock.acquire(timeout = timeout_sec)

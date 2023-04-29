@@ -26,4 +26,18 @@ class EngineBase(ABC):
         Returns:
             str: The response from the model.
         """
-        pass
+        raise NotImplementedError
+
+    @abstractmethod
+    def max_input_length(self) -> int:
+        """Returns the maximum length of the input to the model.
+
+        Returns:
+            int: The maximum length of the input to the model.
+        """
+        raise NotImplementedError
+    
+    @abstractmethod
+    def truncate_message(self, message):
+        """Truncates the message using tiktoken"""
+        raise NotImplementedError

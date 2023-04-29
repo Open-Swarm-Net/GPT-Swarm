@@ -5,7 +5,6 @@ import re
 from swarmai.agents.AgentBase import AgentBase
 from swarmai.utils.ai_engines.GPTConversEngine import GPTConversEngine
 from swarmai.utils.task_queue.Task import Task
-from swarmai.utils.memory.DictInternalMemory import DictInternalMemory
 from swarmai.utils.PromptFactory import PromptFactory
 
 class ManagerAgent(AgentBase):
@@ -20,8 +19,8 @@ class ManagerAgent(AgentBase):
         self.engine = GPTConversEngine("gpt-3.5-turbo", 0.5, 1000)
         
         self.TASK_METHODS = {
-            Task.TaskTypes.synthesis: self._synthesize,
-            Task.TaskTypes.breakdown_to_subtasks: self._breakdown_to_subtasks,
+            Task.TaskTypes.summarisation: self.summarisation,
+            Task.TaskTypes.breakdown_to_subtasks: self.breakdown_to_subtasks,
         }
 
     def perform_task(self):
@@ -44,13 +43,84 @@ class ManagerAgent(AgentBase):
     def share(self):
         pass
 
-    def _synthesize(self, task_description):
-        pass
+    def summarisation(self, task_description):
+        """Summarises the content of the shared memory regarding a specific topic.
+        """
+        self.step = "summarisation"
 
-    def _breakdown_to_subtasks(self, main_task_description):
+        # first, search the memory for the topic
+        memory_search_results_list = self._search_memory(task_description)
+
+        # second, summarise the results
+        summary = self._summarise(memory_search_results_list)
+
+        # add to shared memory
+        self._send_data_to_swarm(
+            data = summary
+        )
+
+    def _search_memory(self, task_description):
+        """Searches the internal memory for a specific topic.
+        Returns a string with the results.
+        """
+        self.step = "_search_memory"
+        # first, search the shared memory for the topic
+        base_memory_search_prompt = PromptFactory.StandardPrompts.memory_search_prompt
+        fpormatting_prompt_list = "The output MUST be formatted in a following way [['query1'; 'query2'; ...]]"
+
+        conversation = [
+            {"role": "system", "content": base_memory_search_prompt + fpormatting_prompt_list},
+            {"role": "user", "content": "Task to research:\n" + task_description}
+        ]
+
+        querries_unformatted = self.engine.call_model(conversation)
+
+        # parse the querries
+        querries_unformatted = re.search(r"\[\[.*\]\]", querries_unformatted)
+        if querries_unformatted is None:
+            return []
+        
+        querries_unformatted = querries_unformatted.group(0)
+        querries_unformatted = querries_unformatted.replace("[", "").replace("]", "").replace("'", "").strip()
+        querries = querries_unformatted.split(";")
+
+        # second, search the memory for each query
+        memory_search_results = []
+        for query_i in querries:
+            self.log(message = f"Searching the memory for the query {query_i}", level = "info")
+            results_list = self.shared_memory.search_memory(query_i)
+            for result_i in results_list:
+                result_i = result_i.replace("\n", "").replace("\r", "").replace("\t", "").strip()
+                self.log(message=f"For the query {query_i} found the result {result_i}", level="debug")
+                memory_search_results.append(result_i)
+
+        return memory_search_results
+
+    def _summarise_results(self, task_description, results_list):
+        """Summarises the results of the search.
+        """
+        self.step = "_summarise_results"
+        summarisation_base_prompt = PromptFactory.StandardPrompts.summarisation_for_task_prompt
+
+        user_prompt = (
+            "Global Tasks:\n" + task_description + "\n"
+            "Results:\n" + "\n".join(results_list) + "\n"
+        )
+
+        conversation = [
+            {"role": "system", "content": summarisation_base_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+
+        summarisation = self.engine.call_model(conversation)
+
+        return summarisation
+
+
+    def breakdown_to_subtasks(self, main_task_description):
         """Breaks down the main task into subtasks and adds them to the task queue.
         """
-        self.step = "_breakdown_to_subtasks"
+        self.step = "breakdown_to_subtasks"
 
         task_breakdown_prompt = PromptFactory.StandardPrompts.task_breakdown
         allowed_subtusk_types = [str(t_i) for t_i in self.swarm.TASK_TYPES]
@@ -75,11 +145,16 @@ class ManagerAgent(AgentBase):
         ]
 
         result = self.engine.call_model(conversation)
+        result = result.replace("\n", "").replace("\r", "").replace("\t", "").strip()
 
         # parse the result
 
         # first, find the substring enclosed in [[]]
-        subtasks_str = re.search(r"\[\[.*\]\]", result).group(0)
+        subtasks_str = re.search(r"\[\[.*\]\]", result)
+        try:
+            subtasks_str = subtasks_str.group(0)
+        except:
+            raise Exception(f"Failed to parse the result {result}")
 
         # then, find all substrings enclosed in ()
         subtasks = []
@@ -108,11 +183,8 @@ class ManagerAgent(AgentBase):
         self._add_subtasks_to_task_queue(subtasks)
 
         # add to shared memory
-        self.shared_memory.add_entry(
-            score = 1,
-            agent_id = self.agent_id,
-            agent_cycle = self.cycle,
-            entry = f"Task {main_task_description} was broken down into {len(subtasks)} subtasks: {subtasks}"
+        self._send_data_to_swarm(
+            data = f"Task '{main_task_description}' was broken down into {len(subtasks)} subtasks: {subtasks}"
         )
 
     def _add_subtasks_to_task_queue(self, subtask_list: list):
@@ -128,10 +200,3 @@ class ManagerAgent(AgentBase):
                 self.swarm.task_queue.add_task(taks_obj_i)
             except:
                 continue
-
-
-
-
-
-
-

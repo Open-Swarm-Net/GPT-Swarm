@@ -19,8 +19,8 @@ def run_swarm(challenge):
 
 if __name__=="__main__":
     main_task =(
-        "Act as an investement analyst. The startup described below is looking for funding. Your task is to find out as much as possible about the ideas space and startup's potential.\n"
-        "Guardrails is an open-source Python package for specifying structure and type, validating and correcting the outputs of large language models (LLMs)."
+        "act as a professional hypercasual game designer, who has a proven track reckord of releasing ultra-successfull hypercasual games that earn millions of dollars per year. Your job is to come up with new original. Let's start with defining the principles of hypercasual game design."
+        "Come up with ideas in the idea space of 'destruction'. You can combine ideas from above. Be so creative, as if you took magic mushrooms. Combine and mix the mechanics in crazy ways, making them overly complex, but then simplify them."
     )
     load_keys()
     run_swarm(main_task)

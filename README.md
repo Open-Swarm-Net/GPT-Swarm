@@ -67,7 +67,6 @@ To use openAI's api, you need to create a keys.json file in the root foler:
 Then as usual `pip install -r requirements.txt` and you are ready to go.
 
 ## Examples
-- tbc, currently can check out `the tests/test.py` and `tests/test.ipynb`
 
 # Documentation
 tbd

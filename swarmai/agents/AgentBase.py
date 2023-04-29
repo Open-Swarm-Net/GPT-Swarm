@@ -164,15 +164,6 @@ class AgentBase(ABC, threading.Thread):
         self.log(f"To shared memory: {data}", level = "debug")
         _ = self.swarm.add_shared_info(self, data) # the lock is set in the swarm
 
-    def add_neighbour(self, neighbour_agent):
-        """Add a neighbor to the agent.
-
-        Args:
-            queue (Queue): The queue to communicate with the neighbor.
-        """
-        self.log(f"Added neighbour: {neighbour_agent.agent_id}", level = "debug")
-        self.neighbor_queues.append(neighbour_agent.message_queue)
-
     def reset(self):
         # Reset the necessary internal state while preserving memory
         self.should_run = True

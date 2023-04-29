@@ -17,7 +17,7 @@ class Task:
         """
         google_search = "google_search"
         breakdown_to_subtasks = "breakdown_to_subtasks"
-        synthesis = "synthesis"
+        summarisation = "summarisation"
         analysis = "analysis"
 
     def __init__(self, priority, task_type, task_description, status="pending", task_id=uuid.uuid4()):
