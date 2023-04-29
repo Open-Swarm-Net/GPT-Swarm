@@ -46,8 +46,12 @@ class GeneralPurposeAgent(AgentBase):
 
     def _think(self, task_description):
         self.step = "think"
-        prompt = f"You need to perform a task: {task_description}. The type of the task is {self.task.task_type}. If you don't have capabilities to perform the task (for example no google access), image you do have them and submit the imagined solution."
-
+        prompt = (
+            "Act as an analyst and worker."
+            f"You need to perform a task: {task_description}. The type of the task is {self.task.task_type}."
+            "If you don't have capabilities to perform the task (for example no google access), image you do have them and submit the solution you would obtain in this case."
+            "Make sure to actually solve the task and provide a valid solution; avoid describing how you would do it."
+        )
         # generate a conversation
         conversation = [
             {"role": "user", "content": prompt}
@@ -57,3 +61,5 @@ class GeneralPurposeAgent(AgentBase):
 
         # add to shared memory
         self._send_data_to_swarm(result)
+        self.log(f"Agent {self.agent_id} of type {self.agent_type} thought about the task:\n{task_description}\n\nand shared the following result:\n{result}", level = "info")
+        return result

@@ -86,11 +86,13 @@ class Swarm:
         """Creates the tesnor of agents according to the tensor shape and the agent role distribution.
         For now just randomly allocating them in the swarm"""
         agents = []
+        counter = 0
         for key, val in self.agent_role_distribution.items():
             agent_role = key
             n = val
             for i in range(n):
-                agent_id = i
+                agent_id = counter
+                counter += 1
                 # need each agent to have its own challenge instance, because sometimes the agens submit the answers with infinite loops
                 # also included a timeout for the agent's computation in the AgentBase class
                 agents.append(self.WORKER_ROLES[agent_role](agent_id, agent_role, self, self.logger))

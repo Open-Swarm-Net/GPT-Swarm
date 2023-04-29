@@ -83,6 +83,9 @@ class AgentBase(ABC, threading.Thread):
         if ifSuccess:
             self._submit_complete_task()
             self.task = None
+        else:
+            self._reset_task()
+            self.task = None
 
     def terminate(self):
         """Terminate the agent
@@ -103,6 +106,9 @@ class AgentBase(ABC, threading.Thread):
     
     def _submit_complete_task(self):
         self.task_queue.complete_task(self.task.task_id)
+
+    def _reset_task(self):
+        self.task_queue.reset_task(self.task.task_id)
 
     def _retrive_messages(self):
         """Retrive messages from the neighbors.
@@ -125,7 +131,7 @@ class AgentBase(ABC, threading.Thread):
         """        
         task = self.task_queue.get_task(self)
         if task is not None:
-            self.log(f"Got task: {task.task_description} of type: {task.task_type} with priority: {task.priority}" , level = "info")
+            self.log(f"Got task: {task.task_id}", level = "debug")
         else:
             self.log(f"No task found. Waiting for the proper task", level = "debug")
             return None

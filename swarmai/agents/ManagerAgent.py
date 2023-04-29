@@ -53,11 +53,13 @@ class ManagerAgent(AgentBase):
 
         # second, summarise the results
         summary = self._summarise_results(task_description, memory_search_results_list)
+        self.log(message = f"Agent {self.agent_id} of type {self.agent_type} summarised the results of the search for the topic:\n{task_description}\n\nwith the following summary:\n{summary}", level = "info")
 
         # add to shared memory
         self._send_data_to_swarm(
             data = summary
         )
+        return summary
 
     def _search_memory(self, task_description):
         """Searches the internal memory for a specific topic.
@@ -153,7 +155,7 @@ class ManagerAgent(AgentBase):
         # parse the result
 
         # first, find the substring enclosed in [[]]
-        subtasks_str = re.search(r"\[\[.*\]\]", result)
+        subtasks_str = re.search(r"\[.*\]", result)
         try:
             subtasks_str = subtasks_str.group(0)
         except:
@@ -186,19 +188,28 @@ class ManagerAgent(AgentBase):
         self._add_subtasks_to_task_queue(subtasks)
 
         # add to shared memory
-        self._send_data_to_swarm(
-            data = f"Task '{main_task_description}' was broken down into {len(subtasks)} subtasks: {subtasks}"
+        self.log(
+            message=f"Task:\n'{main_task_description}'\n\nwas broken down into {len(subtasks)} subtasks:\n{subtasks}",
         )
+        # self._send_data_to_swarm(
+        #     data = f"Task '{main_task_description}' was broken down into {len(subtasks)} subtasks: {subtasks}"
+        # )
+        return subtasks
 
     def _add_subtasks_to_task_queue(self, subtask_list: list):
         self.step = "_add_subtasks_to_task_queue"
+        summary_conversation = [
+            {"role": "system", "content": "Be very concise and precise when summarising the global task. Focus on the most important aspects of the global task to guide the model in performing a given subtask. Don't mention any subtasks but only the main mission as a guide."},
+            {"role": "user", "content": f"""Global Task:\n{self.task.task_description}\nSubtasks:\n{"||".join([x[1] for x in subtask_list])}\nSummary of the global task:"""},
+        ]
+        task_summary = self.engine.call_model(summary_conversation)
         for task_i in subtask_list:
             try:
                 # generating a task object
                 taks_obj_i = Task(
                     priority=task_i[2],
                     task_type=task_i[0],
-                    task_description=f"""For the purpose of '{self.task.task_description.replace("For the purpose of ", "").replace("'", "")}': {task_i[1]}""",
+                    task_description=f"""For the purpose of '{task_summary}' Perform ONLY the following task: {task_i[1]}""",
                 )
                 self.swarm.task_queue.add_task(taks_obj_i)
             except:
