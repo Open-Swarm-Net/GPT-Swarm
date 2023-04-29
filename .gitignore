@@ -1,6 +1,7 @@
 # Custom files
 keys.json
 runs/
+*datasets/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

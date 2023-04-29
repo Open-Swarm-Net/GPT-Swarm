@@ -46,5 +46,16 @@ class PromptFactory:
             "The output should be formatted in a way that is easily parsable in Python, using separators to enclose the subtask type and task description."
         )
 
+        memory_search_prompt=(
+            "You will be presented with a global task. You need to create a list of search queries to find information about this task."
+            "Don't try to solve the task, just think about what you would search for to find the information you need."
+        )
+
+        summarisation_for_task_prompt = (
+            "You will be presented with a global task and some information obtained during the research."
+            "You task is to summarise the information based on the global task."
+            "Be extremely brief and concise. Focus only on the information relevant to the task."
+        )
+
     def gen_prompt(task):
         raise NotImplementedError
