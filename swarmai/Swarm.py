@@ -142,22 +142,6 @@ class Swarm:
         self.log(f"Created {len(agents)} agents with roles: {agent_roles_n}")
           
         return np.array(agents)
-
-    def add_shared_info(self, agent, data):
-        """Adds data to the shared memory
-        Args:
-            agent (AgentBase): The agent that is adding the data
-            data (dict): The data to add
-        """
-        # the mulithreading is handled by the shared memory
-        try:
-            content = data["content"]
-            status = self.shared_memory.add_entry(entry=content)
-
-            return status
-        except Exception as e:
-            self.log(f"Failed to add info {data} to the swarm: {e}", level="error")
-            return False
     
     def log(self, message, level="info"):
         level = level.lower()

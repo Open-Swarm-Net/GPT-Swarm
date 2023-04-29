@@ -8,16 +8,12 @@ from langchain.chains import RetrievalQA
 from langchain.chains.question_answering import load_qa_chain
 
 def synchronized_mem(method):
-    timeout_sec = 30
     def wrapper(self, *args, **kwargs):
         with self.lock:
-            self.lock.acquire(timeout = timeout_sec)
             try:
                 return method(self, *args, **kwargs)
             except Exception as e:
                 print(f"Failed to execute {method.__name__}: {e}")
-            finally:
-                self.lock.release()
     return wrapper
 
 class VectorMemory:
@@ -78,10 +74,12 @@ class VectorMemory:
             - texts (list[str]): a list of the top k results
         """
         if k > self.count:
-            k = self.count
+            k = self.count - 1
+        if k <= 0:
+            return None
 
         if type == "mmr":
-            texts = self.db.max_marginal_relevance_search(query=query, k=k)
+            texts = self.db.max_marginal_relevance_search(query=query, k=k, fetch_k = min(20,self.count))
             texts = [text.page_content for text in texts]
         elif type == "cos":
             texts = self.db.similarity_search_with_score(query=query, k=k)

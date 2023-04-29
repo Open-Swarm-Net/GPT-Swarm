@@ -38,7 +38,7 @@ class GeneralPurposeAgent(AgentBase):
             self.result = self.TASK_METHODS[task_type](self.task.task_description)
             return True
         except Exception as e:
-            self.log(messag = f"Agent {self.agent_id} of type {self.agent_type} failed to perform the task {self.task.task_description} with error {e}", level = "error")
+            self.log(f"Agent {self.agent_id} of type {self.agent_type} failed to perform the task {self.task.task_description} with error {e}", level = "error")
             return False
 
     def share(self):
@@ -56,9 +56,4 @@ class GeneralPurposeAgent(AgentBase):
         result = self.engine.call_model(conversation)
 
         # add to shared memory
-        self.shared_memory.add_entry(
-            score = 1,
-            agent_id = self.agent_id,
-            agent_cycle = self.cycle,
-            entry = result
-        )
+        self._send_data_to_swarm(result)

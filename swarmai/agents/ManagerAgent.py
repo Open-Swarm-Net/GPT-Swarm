@@ -52,7 +52,7 @@ class ManagerAgent(AgentBase):
         memory_search_results_list = self._search_memory(task_description)
 
         # second, summarise the results
-        summary = self._summarise(memory_search_results_list)
+        summary = self._summarise_results(task_description, memory_search_results_list)
 
         # add to shared memory
         self._send_data_to_swarm(
@@ -89,6 +89,9 @@ class ManagerAgent(AgentBase):
         for query_i in querries:
             self.log(message = f"Searching the memory for the query {query_i}", level = "info")
             results_list = self.shared_memory.search_memory(query_i)
+            if results_list is None:
+                self.log(message = f"Could not find any results for the query {query_i}", level = "info")
+                continue
             for result_i in results_list:
                 result_i = result_i.replace("\n", "").replace("\r", "").replace("\t", "").strip()
                 self.log(message=f"For the query {query_i} found the result {result_i}", level="debug")

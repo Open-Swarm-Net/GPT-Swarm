@@ -82,7 +82,6 @@ class AgentBase(ABC, threading.Thread):
         ifSuccess = self.perform_task()
         if ifSuccess:
             self._submit_complete_task()
-            self.share()
             self.task = None
 
     def terminate(self):
@@ -162,7 +161,7 @@ class AgentBase(ABC, threading.Thread):
             data (dict): The data to send: {"score": score, "content": content}
         """
         self.log(f"To shared memory: {data}", level = "debug")
-        _ = self.swarm.add_shared_info(self, data) # the lock is set in the swarm
+        _ = self.shared_memory.add_entry(data)
 
     def reset(self):
         # Reset the necessary internal state while preserving memory
