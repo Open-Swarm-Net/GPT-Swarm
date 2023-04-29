@@ -9,3 +9,4 @@ matplotlib
 seaborn
 tiktoken
 chromadb
+google-api-python-client

@@ -82,10 +82,8 @@ class AgentBase(ABC, threading.Thread):
         ifSuccess = self.perform_task()
         if ifSuccess:
             self._submit_complete_task()
-            self.task = None
         else:
             self._reset_task()
-            self.task = None
 
     def terminate(self):
         """Terminate the agent
@@ -106,9 +104,11 @@ class AgentBase(ABC, threading.Thread):
     
     def _submit_complete_task(self):
         self.task_queue.complete_task(self.task.task_id)
+        self.task = None
 
     def _reset_task(self):
         self.task_queue.reset_task(self.task.task_id)
+        self.task = None
 
     def _retrive_messages(self):
         """Retrive messages from the neighbors.

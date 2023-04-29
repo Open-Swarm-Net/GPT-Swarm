@@ -58,6 +58,7 @@ class VectorMemory:
 
         self.db.add_texts(texts)
         self.count += self.db._collection.count()
+        self.db.persist()
         return True
     
     @synchronized_mem

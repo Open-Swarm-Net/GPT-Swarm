@@ -11,6 +11,9 @@ def load_keys():
     with open(keys_file) as f:
         keys = json.load(f)
     os.environ["OPENAI_API_KEY"] = keys["OPENAI_API_KEY"]
+    os.environ["GOOGLE_API_KEY"] = keys["GOOGLE_API_KEY"]
+    os.environ["CUSTOM_SEARCH_ENGINE_ID"] = keys["CUSTOM_SEARCH_ENGINE_ID"]
+    os.environ["GOOGLE_CSE_ID"] = keys["CUSTOM_SEARCH_ENGINE_ID"]
 
 def run_swarm(swarm_config_loc):
     # establishing the swarm

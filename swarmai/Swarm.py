@@ -11,7 +11,7 @@ from swarmai.utils.memory import VectorMemory
 from swarmai.utils.task_queue.PandasQueue import PandasQueue
 from swarmai.utils.task_queue.Task import Task
 
-from swarmai.agents import ManagerAgent, GeneralPurposeAgent
+from swarmai.agents import ManagerAgent, GeneralPurposeAgent, GooglerAgent
 
 class Swarm:
     """This class is responsible for managing the swarm of agents.
@@ -42,7 +42,7 @@ class Swarm:
 
     WORKER_ROLES = {
         "manager": ManagerAgent,
-        "googler": GeneralPurposeAgent,
+        "googler": GooglerAgent,
         "analyst": GeneralPurposeAgent,
     }
 
@@ -55,7 +55,7 @@ class Swarm:
 
     TASK_ASSOCIATIONS = {
         "manager": [Task.TaskTypes.breakdown_to_subtasks, Task.TaskTypes.summarisation],
-        "googler": [Task.TaskTypes.analysis, Task.TaskTypes.google_search],
+        "googler": [Task.TaskTypes.google_search],
         "analyst": [Task.TaskTypes.summarisation, Task.TaskTypes.analysis, Task.TaskTypes.google_search]
     }
 

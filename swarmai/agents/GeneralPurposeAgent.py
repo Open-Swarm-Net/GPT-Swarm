@@ -1,18 +1,10 @@
-import os
-import openai
-import re
-
 from swarmai.agents.AgentBase import AgentBase
 from swarmai.utils.ai_engines.GPTConversEngine import GPTConversEngine
 from swarmai.utils.task_queue.Task import Task
-from swarmai.utils.memory.DictInternalMemory import DictInternalMemory
 from swarmai.utils.PromptFactory import PromptFactory
 
 class GeneralPurposeAgent(AgentBase):
     """Manager agent class that is responsible for breaking down the tasks into subtasks and assigning them into the task queue.
-
-    Attributes:
-        - 
     """
 
     def __init__(self, agent_id, agent_type, swarm, logger):
