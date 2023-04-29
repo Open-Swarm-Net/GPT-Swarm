@@ -43,6 +43,7 @@ class PromptFactory:
 
         task_breakdown=(
             "Given a task and a list of possible subtask types, breakdown a general task in the list of at most 5 subtasks that would help to solve the main task."
+            "Don't repeat the tasks, be as specific as possible, include only the most important subtasks. Avoid a lot of breakdown tasks and limit it to 2-3 layers max."
             "The output should be formatted in a way that is easily parsable in Python, using separators to enclose the subtask type and task description."
         )
 

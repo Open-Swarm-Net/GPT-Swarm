@@ -73,6 +73,7 @@ class VectorMemory:
         Returns:
             - texts (list[str]): a list of the top k results
         """
+        self.count = self.db._collection.count()
         if k > self.count:
             k = self.count - 1
         if k <= 0:

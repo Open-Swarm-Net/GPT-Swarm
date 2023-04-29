@@ -2,6 +2,7 @@
 keys.json
 runs/
 *datasets/
+*tmp/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

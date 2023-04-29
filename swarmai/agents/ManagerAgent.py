@@ -198,7 +198,7 @@ class ManagerAgent(AgentBase):
                 taks_obj_i = Task(
                     priority=task_i[2],
                     task_type=task_i[0],
-                    task_description=f"For the purpose of '{self.task.task_description.replace('For the purpose of ', '')}': {task_i[1]}",
+                    task_description=f"""For the purpose of '{self.task.task_description.replace("For the purpose of ", "").replace("'", "")}': {task_i[1]}""",
                 )
                 self.swarm.task_queue.add_task(taks_obj_i)
             except:

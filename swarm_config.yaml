@@ -1,0 +1,31 @@
+swarm:
+  agents: # supported: manager, analyst, googler
+    - type: manager
+      n: 2
+    - type: analyst
+      n: 2
+    - type: googler
+      n: 2
+  timeout_min: 10
+  run_dir: ./tmp/swarm
+task:
+  role: |
+    professional venture capital agency, who has a proven track reckord of consistently funding successful startups
+  global_goal: |
+    A new startup just send us their pitch. Find if the startup is worth investing in. The startup is in the space of brain computer interfaces.
+    Their value proposition is to provide objective user experience research for new games beased directly on the brain activity of the user.
+    They have a proprietary algorithm to predict emotions and user experience based on brain activity.
+    They don't develop the games themselves, but they provide the data to game developers.
+    They don't develop any hardware, but they provide the software to collect and analyze the data.
+    More information about them: 'https://brainamics.de', 'https://www.linkedin.com/company/thebrainamics/'
+  goals:
+    - |
+      Generate a comprehensive description of the startup. Find any mentions of the startup in the news, social media, etc.
+      Describe the value proposition, the product, USP and business model of a startup.
+    - Find top companies and startups in this field. Find out their locations, raised funding, value proposition, differentiation, etc.
+    - Find top products in this field.
+    - Find top investors in this field.
+    - Describe the market size, growth rate and trends of this field.
+    - Briefly describe the technology for the non-tech audience. Include links to the main articles in the field.
+    - Who are the main influencers in this field?
+    - What questions should we ask the startup to make a more informed decision?
