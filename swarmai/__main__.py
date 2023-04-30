@@ -11,9 +11,13 @@ def load_keys():
     with open(keys_file) as f:
         keys = json.load(f)
     os.environ["OPENAI_API_KEY"] = keys["OPENAI_API_KEY"]
-    os.environ["GOOGLE_API_KEY"] = keys["GOOGLE_API_KEY"]
-    os.environ["CUSTOM_SEARCH_ENGINE_ID"] = keys["CUSTOM_SEARCH_ENGINE_ID"]
-    os.environ["GOOGLE_CSE_ID"] = keys["CUSTOM_SEARCH_ENGINE_ID"]
+    try:
+        os.environ["GOOGLE_API_KEY"] = keys["GOOGLE_API_KEY"]
+        os.environ["CUSTOM_SEARCH_ENGINE_ID"] = keys["CUSTOM_SEARCH_ENGINE_ID"]
+        os.environ["GOOGLE_CSE_ID"] = keys["CUSTOM_SEARCH_ENGINE_ID"]
+    except:
+        print("WARNING: GOOGLE_API_KEY and GOOGLE_CSE_ID not found in keys.json. Googler agent will be treated as a general purpose agent.")
+
 
 def run_swarm(swarm_config_loc):
     # establishing the swarm

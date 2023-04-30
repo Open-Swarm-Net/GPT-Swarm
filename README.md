@@ -4,10 +4,10 @@
 [![Python Version](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 
 <p align="center">
-  <img src="logo_midjourney.png" alt="Project logo" width="1080">
+  <img src="content/logo_midjourney.png" alt="Project logo" width="1080">
 </p>
 
-GPT-Swarm is a groundbreaking project that combines swarm intelligence and advanced language models to tackle complex tasks across diverse domains. Our innovative framework is robust, adaptive, and scalable, outperforming single models by leveraging the power of collective problem-solving and distributed decision-making.
+GPT-Swarm is a groundbreaking project that combines swarm intelligence and advanced language models to tackle complex tasks across diverse domains. Our innovative framework is robust, adaptive, and scalable, outperforming single models by leveraging the power of collective problem-solving and distributed decision-making. Not to mention the lightning-fast speed with which it performs the research.
 
 
 ## Table of Contents
@@ -19,13 +19,19 @@ GPT-Swarm is a groundbreaking project that combines swarm intelligence and advan
 - [Documentation](#documentation)
 - [How to Contribute](#how-to-contribute)
 
-# Principles
+# Why
 ## What Swarm Intelligence Is
-GPT-Swarm, inspired by the bee search algorithm, employs swarm intelligence to solve optimization problems. Key principles include stigmergy and emergence.
+GPT-Swarm is inspired by the principles of emergence. In nature, when you allow simple agents to interract with each other, they show fundamentally new capabilities. Typical examples are bee or ant hives, or even countries and cultures.
 
-Stigmergy allows agents to communicate indirectly by modifying their environment, sharing information through a shared memory. This resembles the bee's waggle dance for food source communication.
+## Uprecedented Scalability and Diversity
+You can add any models
 
-Emergence is the phenomenon where complex behavior arises from simple local interactions. Our algorithm encourages emergent behavior, enabling the swarm to converge to optimal or near-optimal solutions by working collectively.
+## Adaptive Intelligence without Retraining
+By utilizing shared vector-based memory, and giving the swarm the ability to adjust itself and it's behavior, we achieve similar adaptability as in reinforcement learning, but without expensive retraining of base-models.
+
+## What it can do
+Swarm is the only intelligence system to date that can effectively do complex tasks like performing market research or generating whole software solutions.
+
 
 ## References:
 - [Bees algorithm Wiki](https://en.wikipedia.org/wiki/Bees_algorithm)
@@ -33,54 +39,48 @@ Emergence is the phenomenon where complex behavior arises from simple local inte
 - [Swarm intelligence Wiki](https://en.wikipedia.org/wiki/Swarm_intelligence)
 - [Swarm Intelligence: From Natural to Artificial Systems, by Eric Bonabeau](https://www.amazon.de/Swarm-Intelligence-Artificial-Institute-Complexity/dp/0195131592/ref=sr_1_1?__mk_de_DE=%C3%85M%C3%85%C5%BD%C3%95%C3%91&crid=2IE2ONY3K49RV&keywords=swarm+intelligence+from+natural+to+artificial+systems&qid=1681176913&sprefix=swarm+intelligence+from+natural+to+artificial+systems%2Caps%2C73&sr=8-1)
 
-# Why
-
-## Scalable and Adaptive Intelligence without Retraining
-aaa
-
-## What it can do
-aaa
-
 # Architecture overview
 <p align="center">
-  <img src="diagram.png" alt="Project diagram" width="1080">
+  <img src="content/diagram.png" alt="Project diagram" width="720">
 </p>
-
-Because  the exchange generates a lot of text, there are two 'distillation' steps. First one is to summarise the solutions coming from the neighbors (there I now also take only 4 best solutions. Agents' locations and connections are customisable). In the second summarisation, the agen needs to summarise it's solution and also critically analize it based on the evaluation. Heavy prompt engineering needed for these steps. 
-
-## Features
-
-- Abstractions for agents => you can theoretically use any agents you want in your swarm as long as they implement the interactions between each other and the swarm (for example add agents to the swarm that can google using langchain)
-- Abstractions for the challenges => can ask the swarm so solve any problem as long as you have a cost function.
-Current challenge is looking for the solutions of the leetcode problems
-- Mulithreading for faster computation (still a deadlock somewhere in the python challenge 2)
 
 # Installation and Usage
 
-To use openAI's api, you need to create a keys.json file in the root foler:
-```json
-{
-    "OPENAI_API_KEY": "sk-YoUrKey",
-}
-```
+1. First, you need to create a keys.json file in the root foler. GOOGLE_API_KEY and CUSTOM_SEARCH_ENGINE_ID are needed for the models to be able to use google search.
+    ```json
+    {
+        "OPENAI_API_KEY": "sk-YoUrKey",
+        "GOOGLE_API_KEY": "blablablaapiKey", 
+        "CUSTOM_SEARCH_ENGINE_ID": "12345678aa25"
+    }
+    ```
 
-Then as usual `pip install -r requirements.txt` and you are ready to go.
+2. Then you can specify the swarm configuration and tasks in \
+    `swarm_config.yaml`
 
-## Examples
+3. After that, to run the swarm simply run
+    ```bash
+    # On Linux or Mac:
+    ./run.sh start
+    # On Windows:
+    .\run.bat
+    ```
 
-# Documentation
-tbd
+4. After some time the swarm will start producing a report and storing it in the run folder. By default it's in:\
+    `./tmp/swarm/output.txt` and `./tmp/swarm/output.json`
 
-# Docker
+## Advanced usage
+5. If you are brave, you can go though the logs. Be careful, because the swarm produces incredible amount of data very fast. You can find logs in `./tmp/swarm/swarm.json`. You can also use `./tests/_explore_logs.ipynb` to more easily digest the logs.
 
+6. The shared memory in the run is persistent. You can ask additional questions to this memory using `./tests/_task_to_vdb.ipynb`
+
+# 🚧 Docker
 Build Multi-Arch image:
 
 ```shell
 docker buildx build --platform linux/amd64,linux/arm64 --tag gpt-swarm/gpt-swarm:0.0.0 .
 ```
 
-
 # How to Contribute
-
 - follow the SOLID principles and don't break the abstractions
 - create bite-sized PRs

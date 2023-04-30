@@ -21,4 +21,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY swarmai /app/swarmai
 
-CMD [ "python", "-m", "swarmai.Swarm" ]
+CMD [ "python", "-m", "swarmai.__main__" ]

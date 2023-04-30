@@ -1,12 +1,13 @@
 Todo:
-- input/output
+- website parser
 - add logger to the task queue
-- qa
 
 Bugs:
-
+- Agentbase sometimes doesn't have task when _submit_complete_task is run
 
 Done:
+- regular report qa => new task for the manager
+- input/output
 - find a good challenge that showcases the capabilities
 - remove (or just not use) the concept of neighbours => substitute with shared memory
 - shared memory as a vector database

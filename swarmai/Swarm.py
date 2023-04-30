@@ -3,6 +3,7 @@ from datetime import datetime
 import time
 import yaml
 import threading
+import os
 
 from pathlib import Path
 
@@ -97,8 +98,11 @@ class Swarm:
         counter = 0
         for key, val in self.agent_role_distribution.items():
             agent_role = key
+            # if GOOGLE_API_KEY and GOOGLE_CSE_ID are not in os.environ, then the googler agent will be treated as a general purpose agent
+            if agent_role == "googler" and ("GOOGLE_API_KEY" not in os.environ or "GOOGLE_CSE_ID" not in os.environ):
+                agent_role = "analyst"
             n = val
-            for i in range(n):
+            for _ in range(n):
                 agent_id = counter
                 counter += 1
                 # need each agent to have its own challenge instance, because sometimes the agens submit the answers with infinite loops
