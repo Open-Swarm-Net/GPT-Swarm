@@ -45,7 +45,7 @@ class VectorMemory:
     def _init_retriever(self):
         model = ChatOpenAI(model='gpt-3.5-turbo', temperature=0)
         qa_chain = load_qa_chain(model, chain_type="stuff")
-        retriever = self.db.as_retriever(search_type="mmr")
+        retriever = self.db.as_retriever(search_type="mmr", search_kwargs={"k":10})
         qa = RetrievalQA(combine_documents_chain=qa_chain, retriever=retriever)
         return qa
     
@@ -62,7 +62,7 @@ class VectorMemory:
         return True
     
     @synchronized_mem
-    def search_memory(self, query: str, k=4, type="mmr", distance_threshold=0.5):
+    def search_memory(self, query: str, k=10, type="mmr", distance_threshold=0.5):
         """Searching the vector memory for similar entries
         
         Args:

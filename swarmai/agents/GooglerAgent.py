@@ -39,7 +39,7 @@ class GooglerAgent(AgentBase):
     def google(self, task_description):
         self.step = "google"
 
-        # just googleing
+        # just googling
         system_prompt = PromptFactory.StandardPrompts.google_search_config_prompt
 
         conversation = [
@@ -49,7 +49,12 @@ class GooglerAgent(AgentBase):
         result = self.search_engine.call_model(conversation)
 
         # summarize and pretify the result
-        summarisation_prompt = "After googling, you found the results listed below. Summarize them and you MUST provide links and sources!"
+        summarisation_prompt =(
+            f"After googling the topic {task_description}, you found the results listed below."
+            "Summarize the facts as brief as possible"
+            "You MUST provide the links as sources for each fact."
+            "Add tags in brackets to the facts to make them more searchable. For example: (Company X market trends), (Company X competitors), etc."
+        )
         conversation = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": summarisation_prompt + f"Search Results:\n{result}"},

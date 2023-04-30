@@ -57,7 +57,7 @@ class GPTConversEngine(EngineBase):
                 raise ValueError("Conversation messages must have a format: {'role': 'user', 'content': 'message'}. 'role' is missing.")
             if "content" not in message:
                 raise ValueError("Conversation messages must have a format: {'role': 'user', 'content': 'message'}. 'content' is missing.")
-            message["content"] = self.truncate_message(message["content"], self.max_input_length()-total_len)
+            message["content"] = self.truncate_message(message["content"], self.max_input_length()-total_len-100)
             new_message_len = len(self.tiktoken_encoding.encode(message["content"]))
             total_len += new_message_len
         

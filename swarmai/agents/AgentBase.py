@@ -66,11 +66,15 @@ class AgentBase(ABC, threading.Thread):
             self.job = AgentJob(self.agent_iteration, ())
             self.job.name = f"Agent {self.agent_id}, cycle {self.cycle}"
             self.job.start()
-            self.job.join(timeout = 120)
+            if self.agent_type=="manager":
+                self.job.join()
+            else:
+                self.job.join(timeout = 120)
 
             # there is no deadlock, but the agetns sometimes submit code with infinite loops, so need to kill the jobs
             if self.job.is_alive():
                 self.log("Stuck. Dropping the thread.", level = "error")
+                self._reset_task()
 
             self.cycle += 1
             if self.cycle >= self.max_cycles:

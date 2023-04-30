@@ -2,6 +2,7 @@ import numpy as np
 from datetime import datetime
 import time
 import yaml
+import threading
 
 from pathlib import Path
 
@@ -50,11 +51,12 @@ class Swarm:
         Task.TaskTypes.summarisation,
         Task.TaskTypes.breakdown_to_subtasks,
         Task.TaskTypes.google_search,
-        Task.TaskTypes.analysis
+        Task.TaskTypes.analysis,
+        Task.TaskTypes.report_preparation
     ]
 
     TASK_ASSOCIATIONS = {
-        "manager": [Task.TaskTypes.breakdown_to_subtasks, Task.TaskTypes.summarisation],
+        "manager": [Task.TaskTypes.breakdown_to_subtasks, Task.TaskTypes.report_preparation],
         "googler": [Task.TaskTypes.google_search],
         "analyst": [Task.TaskTypes.summarisation, Task.TaskTypes.analysis, Task.TaskTypes.google_search]
     }
@@ -71,6 +73,9 @@ class Swarm:
         # creating shared memory
         self.shared_memory_file = self.data_dir / 'shared_memory'
         self.shared_memory = VectorMemory(self.shared_memory_file)
+        self.output_file = self.data_dir / 'output.txt'
+        with open(self.output_file, 'w') as f:
+            f.write("")
 
         # creating task queue
         self.task_queue = PandasQueue(self.TASK_TYPES, self.WORKER_ROLES.keys(), self.TASK_ASSOCIATIONS)
@@ -81,6 +86,9 @@ class Swarm:
         # creating agents
         self.agents_ids = []
         self.agents = self._create_agents() # returns just a list of agents
+
+        # get a lock
+        self.lock = threading.Lock()
 
     def _create_agents(self):
         """Creates the tesnor of agents according to the tensor shape and the agent role distribution.
@@ -115,6 +123,8 @@ class Swarm:
             )
             self.task_queue.add_task(task_i)
 
+        self.create_report_qa_task()
+
         # start the agents
         for agent in self.agents:
             agent.max_cycles = 50
@@ -127,13 +137,26 @@ class Swarm:
             time.sleep(self.timeout)
         else:
             time.sleep(1000000000000000000000000)
-        for agent in self.agents:
-            agent.ifRun = False
-
-        for agent in self.agents:
-            agent.join()
+        self.stop()
 
         self.log("All agents have finished their work")
+
+    def create_report_qa_task(self):
+        """Creates a task that will be used to evaluate the report quality.
+        Make it as a method, because it will be called by the manager agent too.
+        """
+        task_i = Task(
+            priority=50,
+            task_type=Task.TaskTypes.report_preparation,
+            task_description=f"Prepare a final report about a global goal."
+        )
+        self.task_queue.add_task(task_i)
+
+    def stop(self):
+        for agent in self.agents:
+            agent.ifRun = False
+        for agent in self.agents:
+            agent.join()
 
     def _parse_swarm_config(self):
         """Parses the swarm configuration file and returns the agent role distribution.
@@ -174,6 +197,28 @@ class Swarm:
         self.role = config["task"]["role"]
         self.global_goal = config["task"]["global_goal"]
         self.goals = config["task"]["goals"]
+
+    def interact_with_output(self, message, method="write"):
+        """Writed/read the report file.
+        Needed to do it as one method due to multithreading.
+        """
+        with self.lock:
+            if method == "write":
+                # completely overwriting the file
+                with open(self.output_file, "w") as f:
+                    f.write(message)
+                    f.close()
+                    return message
+                
+            elif method == "read":
+                # reading the report file
+                with open(self.output_file, "r") as f:
+                    message = f.read()
+                    f.close()
+                    return message
+
+            else:
+                raise ValueError(f"Unknown method {method}")
 
     def log(self, message, level="info"):
         level = level.lower()
