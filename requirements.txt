@@ -7,6 +7,6 @@ langchain
 PyYAML
 matplotlib
 seaborn
-langchain
 tiktoken
-qdrant-client
+chromadb
+google-api-python-client

@@ -1,6 +1,7 @@
 import os
 import openai
 import re
+import random
 
 from swarmai.agents.AgentBase import AgentBase
 from swarmai.utils.ai_engines.GPTConversEngine import GPTConversEngine
@@ -16,10 +17,10 @@ class ManagerAgent(AgentBase):
 
     def __init__(self, agent_id, agent_type, swarm, logger):
         super().__init__(agent_id, agent_type, swarm, logger)
-        self.engine = GPTConversEngine("gpt-3.5-turbo", 0.5, 1000)
+        self.engine = GPTConversEngine("gpt-3.5-turbo", 0.5, 2000)
         
         self.TASK_METHODS = {
-            Task.TaskTypes.summarisation: self.summarisation,
+            Task.TaskTypes.report_preparation: self.report_preparation,
             Task.TaskTypes.breakdown_to_subtasks: self.breakdown_to_subtasks,
         }
 
@@ -53,11 +54,13 @@ class ManagerAgent(AgentBase):
 
         # second, summarise the results
         summary = self._summarise_results(task_description, memory_search_results_list)
+        self.log(message = f"Agent {self.agent_id} of type {self.agent_type} summarised the results of the search for the topic:\n{task_description}\n\nwith the following summary:\n{summary}", level = "info")
 
         # add to shared memory
         self._send_data_to_swarm(
             data = summary
         )
+        return summary
 
     def _search_memory(self, task_description):
         """Searches the internal memory for a specific topic.
@@ -120,6 +123,100 @@ class ManagerAgent(AgentBase):
         return summarisation
 
 
+    def report_preparation(self, task_description):
+        """The manager agent prepares a report.
+        For each goal of the swarm:
+            1. It reads the current report.
+            2. It analyses which information is missing in the report to solve the global task.
+            3. Then it tries to find this information in the shared memory
+            Updating report:
+                If it finds the information:
+                    it adds it to the report
+                else:
+                    it adds the task to the task queue
+
+                Finally: resets the report preparation task
+        """
+        global_goal = self.swarm.global_goal
+        subgoals = self.swarm.goals
+        random.shuffle(subgoals)
+
+        report_ready = True
+        for goal in subgoals:
+            final_report = self.swarm.interact_with_output("",  method="read") # report can be updated by other managers in the meantime
+            new_info_from_memory = ""
+            new_subtasks = []
+            missing_information_list = self._analyse_report(final_report, global_goal, goal)
+            for el in missing_information_list:
+                finding = self.shared_memory.ask_question(f"For the purpose of {global_goal}, try to find {el} in the memory. You must indclude web-lins of sources. If nothing relevant is found, say 'no_info_found'. Be an extremely critical analyst! If you doubt the infirmation, say 'questionable_info'.")
+                if "no_info_found" in finding or "questionable_info" in finding:
+                    new_subtasks.append(('google_search', f"For the purpose of {goal}, find information about {el}", 50))
+                else:
+                    new_info_from_memory += f"Found {finding} about {el} for {goal}\n"
+            
+            if new_info_from_memory != "":
+                report_ready = False
+                self._update_report(final_report, new_info_from_memory)
+            
+            if len(new_subtasks) > 0:
+                report_ready = False
+                self._add_subtasks_to_task_queue(new_subtasks)
+                
+
+        if report_ready:
+            self.swarm.stop()
+            return True
+        else:
+            self.swarm.create_report_qa_task()
+
+
+    def _analyse_report(self, report, global_goal, goal):
+        """Checks what information is missing in the report to solve the global task.
+        """
+        prompt = (
+            f"Our global goal is:\n{global_goal}\n"
+            f"The following report was prepared to solve this goal:\n{report}\n"
+            f"Which information is missing in the report to solve a specific subgoal:\n{goal}\n"
+            f"Provide 5 most crucial missing facts/information in the following format: ['info1'; 'info2'; ...]"
+            f"Also be very criticall! Add 5 additional points to the list that must be fact checked."
+            f"If no information is missing or no extention possible, you MUST output only: ['no_missing_info']"
+        )
+        conversation = [
+            {"role": "user", "content": prompt},
+        ]
+        missing_information_output = self.engine.call_model(conversation)
+
+        # parse the output
+        missing_information_output = re.search(r"\[.*\]", missing_information_output)
+        if missing_information_output is None:
+            return []
+        missing_information_output = missing_information_output.group(0)
+        missing_information_output = missing_information_output.replace("[", "").replace("]", "").replace("'", "").strip()
+        missing_information_list = missing_information_output.split(";")
+
+        if missing_information_list == ["no_missing_info"]:
+            return []
+
+        return missing_information_list
+
+    def _update_report(self, report, new_info_from_memory):
+        """Updates the report with the new information from the memory.
+        """
+        prompt = (
+            f"Make the report as concise and brief (under 2000 tokens) focusing on the most important information and facts. Provide working links."
+            """The report must be in the following format as json with proper indentations: {[{"Question": "question1", "Answer": "answer1", "Sources": "web links of the sources"}]}"""
+            f"""Update the report with the new information. For the questions: {"//".join(self.swarm.goals)}"""
+            f"The following report was prepared:\n{report}\n"
+            f"The following new information was found:\n{new_info_from_memory}\n" # can get truncated
+        )
+        conversation = [
+            {"role": "user", "content": prompt},
+        ]
+        updated_report = self.engine.call_model(conversation)
+
+        self.swarm.interact_with_output(updated_report, method="write")
+        self.swarm.create_report_qa_task()
+
     def breakdown_to_subtasks(self, main_task_description):
         """Breaks down the main task into subtasks and adds them to the task queue.
         """
@@ -153,7 +250,7 @@ class ManagerAgent(AgentBase):
         # parse the result
 
         # first, find the substring enclosed in [[]]
-        subtasks_str = re.search(r"\[\[.*\]\]", result)
+        subtasks_str = re.search(r"\[.*\]", result)
         try:
             subtasks_str = subtasks_str.group(0)
         except:
@@ -186,19 +283,31 @@ class ManagerAgent(AgentBase):
         self._add_subtasks_to_task_queue(subtasks)
 
         # add to shared memory
-        self._send_data_to_swarm(
-            data = f"Task '{main_task_description}' was broken down into {len(subtasks)} subtasks: {subtasks}"
+        self.log(
+            message=f"Task:\n'{main_task_description}'\n\nwas broken down into {len(subtasks)} subtasks:\n{subtasks}",
         )
+        # self._send_data_to_swarm(
+        #     data = f"Task '{main_task_description}' was broken down into {len(subtasks)} subtasks: {subtasks}"
+        # )
+        return subtasks
 
     def _add_subtasks_to_task_queue(self, subtask_list: list):
+        if len(subtask_list) == 0:
+            return
+
         self.step = "_add_subtasks_to_task_queue"
+        summary_conversation = [
+            {"role": "system", "content": "Be very concise and precise when summarising the global task. Focus on the most important aspects of the global task to guide the model in performing a given subtask. Don't mention any subtasks but only the main mission as a guide."},
+            {"role": "user", "content": f"""Global Task:\n{self.task.task_description}\nSubtasks:\n{"||".join([x[1] for x in subtask_list])}\nSummary of the global task:"""},
+        ]
+        task_summary = self.engine.call_model(summary_conversation)
         for task_i in subtask_list:
             try:
                 # generating a task object
                 taks_obj_i = Task(
                     priority=task_i[2],
                     task_type=task_i[0],
-                    task_description=f"For the purpose of '{self.task.task_description.replace('For the purpose of ', '')}': {task_i[1]}",
+                    task_description=f"""For the purpose of '{task_summary}' Perform ONLY the following task: {task_i[1]}""",
                 )
                 self.swarm.task_queue.add_task(taks_obj_i)
             except:

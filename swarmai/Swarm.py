@@ -1,6 +1,8 @@
 import numpy as np
 from datetime import datetime
 import time
+import yaml
+import threading
 
 from pathlib import Path
 
@@ -10,7 +12,7 @@ from swarmai.utils.memory import VectorMemory
 from swarmai.utils.task_queue.PandasQueue import PandasQueue
 from swarmai.utils.task_queue.Task import Task
 
-from swarmai.agents import ManagerAgent, GeneralPurposeAgent
+from swarmai.agents import ManagerAgent, GeneralPurposeAgent, GooglerAgent
 
 class Swarm:
     """This class is responsible for managing the swarm of agents.
@@ -41,7 +43,7 @@ class Swarm:
 
     WORKER_ROLES = {
         "manager": ManagerAgent,
-        "googler": GeneralPurposeAgent,
+        "googler": GooglerAgent,
         "analyst": GeneralPurposeAgent,
     }
 
@@ -49,31 +51,31 @@ class Swarm:
         Task.TaskTypes.summarisation,
         Task.TaskTypes.breakdown_to_subtasks,
         Task.TaskTypes.google_search,
-        Task.TaskTypes.analysis
+        Task.TaskTypes.analysis,
+        Task.TaskTypes.report_preparation
     ]
 
     TASK_ASSOCIATIONS = {
-        "manager": [Task.TaskTypes.breakdown_to_subtasks, Task.TaskTypes.summarisation],
-        "googler": [Task.TaskTypes.analysis, Task.TaskTypes.google_search],
+        "manager": [Task.TaskTypes.breakdown_to_subtasks, Task.TaskTypes.report_preparation],
+        "googler": [Task.TaskTypes.google_search],
         "analyst": [Task.TaskTypes.summarisation, Task.TaskTypes.analysis, Task.TaskTypes.google_search]
     }
 
-    def __init__(self, agents_tensor_shape, agent_role_distribution):
+    def __init__(self, swarm_config_loc):
         """Initializes the swarm.
 
         Args:
-            agents_tensor_shape (tuple): The number of agents in the swarm
             agent_role_distribution (dict): The dictionary that maps the agent roles to the weight of agents with that role
         """
-        self.agents_tensor_shape = agents_tensor_shape
-        self.agent_role_distribution = agent_role_distribution
-
-        self.data_dir = Path(__file__).parent.parent.resolve() / "runs" / f"run_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.swarm_config_loc = swarm_config_loc
+        self._parse_swarm_config()
 
         # creating shared memory
         self.shared_memory_file = self.data_dir / 'shared_memory'
         self.shared_memory = VectorMemory(self.shared_memory_file)
+        self.output_file = self.data_dir / 'output.txt'
+        with open(self.output_file, 'w') as f:
+            f.write("")
 
         # creating task queue
         self.task_queue = PandasQueue(self.TASK_TYPES, self.WORKER_ROLES.keys(), self.TASK_ASSOCIATIONS)
@@ -85,18 +87,43 @@ class Swarm:
         self.agents_ids = []
         self.agents = self._create_agents() # returns just a list of agents
 
-    def run_swarm(self, main_task, max_sec=10):
+        # get a lock
+        self.lock = threading.Lock()
+
+    def _create_agents(self):
+        """Creates the tesnor of agents according to the tensor shape and the agent role distribution.
+        For now just randomly allocating them in the swarm"""
+        agents = []
+        counter = 0
+        for key, val in self.agent_role_distribution.items():
+            agent_role = key
+            n = val
+            for i in range(n):
+                agent_id = counter
+                counter += 1
+                # need each agent to have its own challenge instance, because sometimes the agens submit the answers with infinite loops
+                # also included a timeout for the agent's computation in the AgentBase class
+                agents.append(self.WORKER_ROLES[agent_role](agent_id, agent_role, self, self.logger))
+                self.agents_ids.append(agent_id)
+
+        self.log(f"Created {len(agents)} agents with roles: {[agent.agent_type for agent in agents]}")
+          
+        return np.array(agents)
+
+    def run_swarm(self):
         """Runs the swarm for a given number of cycles or until the termination condition is met.
         """
         # add the main task to the task queue
-        main_task = Task(
-            priority=0,
-            task_type=Task.TaskTypes.breakdown_to_subtasks,
-            task_description=main_task,
-        )
-        n_managers = len([agent for agent in self.agents if agent.agent_type == "manager"])
-        for _ in range(n_managers):
-            self.task_queue.add_task(main_task)
+        n_initial_manager_tasks = len(self.goals)
+        for i in range(n_initial_manager_tasks):
+            task_i = Task(
+                priority=100,
+                task_type=Task.TaskTypes.breakdown_to_subtasks,
+                task_description=f"Act as:\n{self.role}Gloabl goal:\n{self.global_goal}\nYour specific task is:\n{self.goals[i]}"
+            )
+            self.task_queue.add_task(task_i)
+
+        self.create_report_qa_task()
 
         # start the agents
         for agent in self.agents:
@@ -105,44 +132,94 @@ class Swarm:
             self.log(f"Starting agent {agent.agent_id} with type {agent.agent_type}")
             agent.start()
 
-        time.sleep(max_sec)
-        for agent in self.agents:
-            agent.ifRun = False
-
-        for agent in self.agents:
-            agent.join()
+        if self.timeout is not None:
+            self.log(f"Swarm will run for {self.timeout} seconds")
+            time.sleep(self.timeout)
+        else:
+            time.sleep(1000000000000000000000000)
+        self.stop()
 
         self.log("All agents have finished their work")
 
-
-    def _create_agents(self):
-        """Creates the tesnor of agents according to the tensor shape and the agent role distribution.
-        For now just randomly allocating them in the swarm"""
-        n_agents = np.prod(self.agents_tensor_shape)
-        agent_keys = list(self.agent_role_distribution.keys())
-        p=[self.agent_role_distribution[k] for k in agent_keys]
-
-        # normalizing the distribution
-        p = np.array(p) / np.sum(p)
-
-        agent_roles_n = np.random.choice(
-            agent_keys,
-            size=n_agents,
-            p=p,
+    def create_report_qa_task(self):
+        """Creates a task that will be used to evaluate the report quality.
+        Make it as a method, because it will be called by the manager agent too.
+        """
+        task_i = Task(
+            priority=50,
+            task_type=Task.TaskTypes.report_preparation,
+            task_description=f"Prepare a final report about a global goal."
         )
+        self.task_queue.add_task(task_i)
 
-        agents = []
-        for id, agent_role in enumerate(agent_roles_n):
-            agent_id = id
-            # need each agent to have its own challenge instance, because sometimes the agens submit the answers with infinite loops
-            # also included a timeout for the agent's computation in the AgentBase class
-            agents.append(self.WORKER_ROLES[agent_role](agent_id, agent_role, self, self.logger))
-            self.agents_ids.append(agent_id)
+    def stop(self):
+        for agent in self.agents:
+            agent.ifRun = False
+        for agent in self.agents:
+            agent.join()
 
-        self.log(f"Created {len(agents)} agents with roles: {agent_roles_n}")
-          
-        return np.array(agents)
-    
+    def _parse_swarm_config(self):
+        """Parses the swarm configuration file and returns the agent role distribution.
+        It's a yaml file with the following structure:
+
+        swarm:
+            agents: # supported: manager, analyst, googler
+                - type: manager
+                n: 5
+                - type: analyst
+                n: 10
+            timeout: 10m
+            run_dir: /tmp/swarm
+        task:
+            role: |
+                professional venture capital agency, who has a proven track reckord of consistently funding successful startups
+            global_goal: |
+                A new startup just send us their pitch. Find if the startup is worth investing in. The startup is in the space of brain computer interfaces.
+                Their value proposition is to provide objective user experience research for new games beased directly on the brain activity of the user.
+            goals:
+                - Generate a comprehensive description of the startup. Find any mentions of the startup in the news, social media, etc.
+                - Find top companies and startups in this field. Find out their locations, raised funding, value proposition, differentiation, etc.
+        """
+        file = self.swarm_config_loc
+        with open(file, "r") as f:
+            config = yaml.safe_load(f)
+
+        self.agent_role_distribution = {}
+        for agent in config["swarm"]["agents"]:
+            self.agent_role_distribution[agent["type"]] = agent["n"]
+        
+        self.timeout = config["swarm"]["timeout_min"]*60
+        
+        self.data_dir = Path(".", config["swarm"]["run_dir"])
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+
+        # getting the tasks
+        self.role = config["task"]["role"]
+        self.global_goal = config["task"]["global_goal"]
+        self.goals = config["task"]["goals"]
+
+    def interact_with_output(self, message, method="write"):
+        """Writed/read the report file.
+        Needed to do it as one method due to multithreading.
+        """
+        with self.lock:
+            if method == "write":
+                # completely overwriting the file
+                with open(self.output_file, "w") as f:
+                    f.write(message)
+                    f.close()
+                    return message
+                
+            elif method == "read":
+                # reading the report file
+                with open(self.output_file, "r") as f:
+                    message = f.read()
+                    f.close()
+                    return message
+
+            else:
+                raise ValueError(f"Unknown method {method}")
+
     def log(self, message, level="info"):
         level = level.lower()
         if level == "info":

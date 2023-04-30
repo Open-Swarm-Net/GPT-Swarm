@@ -66,11 +66,15 @@ class AgentBase(ABC, threading.Thread):
             self.job = AgentJob(self.agent_iteration, ())
             self.job.name = f"Agent {self.agent_id}, cycle {self.cycle}"
             self.job.start()
-            self.job.join(timeout = 120)
+            if self.agent_type=="manager":
+                self.job.join()
+            else:
+                self.job.join(timeout = 120)
 
             # there is no deadlock, but the agetns sometimes submit code with infinite loops, so need to kill the jobs
             if self.job.is_alive():
                 self.log("Stuck. Dropping the thread.", level = "error")
+                self._reset_task()
 
             self.cycle += 1
             if self.cycle >= self.max_cycles:
@@ -82,7 +86,8 @@ class AgentBase(ABC, threading.Thread):
         ifSuccess = self.perform_task()
         if ifSuccess:
             self._submit_complete_task()
-            self.task = None
+        else:
+            self._reset_task()
 
     def terminate(self):
         """Terminate the agent
@@ -103,6 +108,11 @@ class AgentBase(ABC, threading.Thread):
     
     def _submit_complete_task(self):
         self.task_queue.complete_task(self.task.task_id)
+        self.task = None
+
+    def _reset_task(self):
+        self.task_queue.reset_task(self.task.task_id)
+        self.task = None
 
     def _retrive_messages(self):
         """Retrive messages from the neighbors.
@@ -125,7 +135,7 @@ class AgentBase(ABC, threading.Thread):
         """        
         task = self.task_queue.get_task(self)
         if task is not None:
-            self.log(f"Got task: {task.task_description} of type: {task.task_type} with priority: {task.priority}" , level = "info")
+            self.log(f"Got task: {task.task_id}", level = "debug")
         else:
             self.log(f"No task found. Waiting for the proper task", level = "debug")
             return None

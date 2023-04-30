@@ -1,14 +1,16 @@
 Todo:
-- find a good challenge that showcases the capabilities
-- Task queue
-- remove (or just not use) the concept of neighbours => substitute with shared memory
-- shared memory as a vector database
+- input/output
 - add logger to the task queue
+- qa
 
 Bugs:
 
 
 Done:
+- find a good challenge that showcases the capabilities
+- remove (or just not use) the concept of neighbours => substitute with shared memory
+- shared memory as a vector database
+- Task queue
 - prompt factory
 - ascynchronous execution
 - multithreading

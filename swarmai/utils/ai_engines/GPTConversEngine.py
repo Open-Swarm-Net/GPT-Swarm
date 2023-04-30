@@ -17,15 +17,6 @@ class GPTConversEngine(EngineBase):
         "gpt-3.5-turbo-0301"
     ]
 
-    TOKEN_LIMITS = {
-        "gpt-4": 16*1024,
-        "gpt-4-0314": 16*1024,
-        "gpt-4-32k": 32*1024,
-        "gpt-4-32k-0314": 32*1024,
-        "gpt-3.5-turbo": 4*1024,
-        "gpt-3.5-turbo-0301": 4*1024
-    }
-
     def __init__(self, model_name: str, temperature: float, max_response_tokens: int):
 
         if model_name not in self.SUPPORTED_MODELS:
@@ -66,7 +57,7 @@ class GPTConversEngine(EngineBase):
                 raise ValueError("Conversation messages must have a format: {'role': 'user', 'content': 'message'}. 'role' is missing.")
             if "content" not in message:
                 raise ValueError("Conversation messages must have a format: {'role': 'user', 'content': 'message'}. 'content' is missing.")
-            message["content"] = self.truncate_message(message["content"], self.max_input_length()-total_len)
+            message["content"] = self.truncate_message(message["content"], self.max_input_length()-total_len-100)
             new_message_len = len(self.tiktoken_encoding.encode(message["content"]))
             total_len += new_message_len
         
@@ -75,26 +66,6 @@ class GPTConversEngine(EngineBase):
         except:
             return ""
         return response["choices"][0]["message"]["content"]
-    
-    def max_input_length(self) -> int:
-        """Returns the maximum length of the input to the model in temrs of tokens.
 
-        Returns:
-            int: The max tokens to input to the model.
-        """
-        return self.TOKEN_LIMITS[self.model_name]-self.max_response_tokens
-    
-    def truncate_message(self, message, token_limit=None):
-        """Truncates the message using tiktoken"""
-        max_tokens = self.max_input_length()
-        message_tokens = self.tiktoken_encoding.encode(message)
-
-        if token_limit is not None:
-            max_tokens = min(max_tokens, token_limit)
-
-        if len(message_tokens) <= max_tokens:
-            return message
-        else:
-            return self.tiktoken_encoding.decode(message_tokens[:max_tokens])
         
         

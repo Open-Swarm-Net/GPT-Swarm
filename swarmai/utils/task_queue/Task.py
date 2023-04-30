@@ -19,6 +19,7 @@ class Task:
         breakdown_to_subtasks = "breakdown_to_subtasks"
         summarisation = "summarisation"
         analysis = "analysis"
+        report_preparation = "report_preparation"
 
     def __init__(self, priority, task_type, task_description, status="pending", task_id=uuid.uuid4()):
         self.task_id = task_id

@@ -45,7 +45,14 @@ class TaskQueueBase(ABC):
     @synchronized_queue
     @abstractmethod
     def complete_task(self, task_id: str):
-        """Gets the next task from the queue.
+        """Sets the task as completed.
+        """
+        raise NotImplementedError
+    
+    @synchronized_queue
+    @abstractmethod
+    def reset_task(self, task_id: str):
+        """Resets the task if the agent failed to complete it.
         """
         raise NotImplementedError
 

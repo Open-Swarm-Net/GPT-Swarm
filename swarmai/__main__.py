@@ -11,16 +11,16 @@ def load_keys():
     with open(keys_file) as f:
         keys = json.load(f)
     os.environ["OPENAI_API_KEY"] = keys["OPENAI_API_KEY"]
+    os.environ["GOOGLE_API_KEY"] = keys["GOOGLE_API_KEY"]
+    os.environ["CUSTOM_SEARCH_ENGINE_ID"] = keys["CUSTOM_SEARCH_ENGINE_ID"]
+    os.environ["GOOGLE_CSE_ID"] = keys["CUSTOM_SEARCH_ENGINE_ID"]
 
-def run_swarm(challenge):
+def run_swarm(swarm_config_loc):
     # establishing the swarm
-    swarm1 = Swarm((10,), {"manager": 3, "analyst": 9})
-    swarm1.run_swarm(challenge, max_sec=120)
+    swarm1 = Swarm(swarm_config_loc)
+    swarm1.run_swarm()
 
 if __name__=="__main__":
-    main_task =(
-        "act as a professional hypercasual game designer, who has a proven track reckord of releasing ultra-successfull hypercasual games that earn millions of dollars per year. Your job is to come up with new original. Let's start with defining the principles of hypercasual game design."
-        "Come up with ideas in the idea space of 'destruction'. You can combine ideas from above. Be so creative, as if you took magic mushrooms. Combine and mix the mechanics in crazy ways, making them overly complex, but then simplify them."
-    )
+    swarm_config_loc = Path(__file__).parent.parent / "swarm_config.yaml"
     load_keys()
-    run_swarm(main_task)
+    run_swarm(swarm_config_loc)
