@@ -36,90 +36,11 @@ class ManagerAgent(AgentBase):
             self.result = self.TASK_METHODS[task_type](self.task.task_description)
             return True
         except Exception as e:
-            self.log(message = f"Agent {self.agent_id} of type {self.agent_type} failed to perform the task {self.task.task_description} with error {e}", level = "error")
+            self.log(message = f"Agent {self.agent_id} of type {self.agent_type} failed to perform the task {self.task.task_description[:20]}...{self.task.task_description[-20:]} of type {self.task.task_type} with error {e}", level = "error")
             return False
 
     def share(self):
         pass
-
-    def summarisation(self, task_description):
-        """Summarises the content of the shared memory regarding a specific topic.
-        """
-        self.step = "summarisation"
-
-        # first, search the memory for the topic
-        memory_search_results_list = self._search_memory(task_description)
-
-        # second, summarise the results
-        summary = self._summarise_results(task_description, memory_search_results_list)
-        self.log(message = f"Agent {self.agent_id} of type {self.agent_type} summarised the results of the search for the topic:\n{task_description}\n\nwith the following summary:\n{summary}", level = "info")
-
-        # add to shared memory
-        self._send_data_to_swarm(
-            data = summary
-        )
-        return summary
-
-    def _search_memory(self, task_description):
-        """Searches the internal memory for a specific topic.
-        Returns a string with the results.
-        """
-        self.step = "_search_memory"
-        # first, search the shared memory for the topic
-        base_memory_search_prompt = PromptFactory.StandardPrompts.memory_search_prompt
-        fpormatting_prompt_list = "The output MUST be formatted in a following way [['query1'; 'query2'; ...]]"
-
-        conversation = [
-            {"role": "system", "content": base_memory_search_prompt + fpormatting_prompt_list},
-            {"role": "user", "content": "Task to research:\n" + task_description}
-        ]
-
-        querries_unformatted = self.engine.call_model(conversation)
-
-        # parse the querries
-        querries_unformatted = re.search(r"\[\[.*\]\]", querries_unformatted)
-        if querries_unformatted is None:
-            return []
-        
-        querries_unformatted = querries_unformatted.group(0)
-        querries_unformatted = querries_unformatted.replace("[", "").replace("]", "").replace("'", "").strip()
-        querries = querries_unformatted.split(";")
-
-        # second, search the memory for each query
-        memory_search_results = []
-        for query_i in querries:
-            self.log(message = f"Searching the memory for the query {query_i}", level = "info")
-            results_list = self.shared_memory.search_memory(query_i)
-            if results_list is None:
-                self.log(message = f"Could not find any results for the query {query_i}", level = "info")
-                continue
-            for result_i in results_list:
-                result_i = result_i.replace("\n", "").replace("\r", "").replace("\t", "").strip()
-                self.log(message=f"For the query {query_i} found the result {result_i}", level="debug")
-                memory_search_results.append(result_i)
-
-        return memory_search_results
-
-    def _summarise_results(self, task_description, results_list):
-        """Summarises the results of the search.
-        """
-        self.step = "_summarise_results"
-        summarisation_base_prompt = PromptFactory.StandardPrompts.summarisation_for_task_prompt
-
-        user_prompt = (
-            "Global Tasks:\n" + task_description + "\n"
-            "Results:\n" + "\n".join(results_list) + "\n"
-        )
-
-        conversation = [
-            {"role": "system", "content": summarisation_base_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-
-        summarisation = self.engine.call_model(conversation)
-
-        return summarisation
-
 
     def report_preparation(self, task_description):
         """The manager agent prepares a report.
@@ -136,37 +57,56 @@ class ManagerAgent(AgentBase):
                 Finally: resets the report preparation task
         """
         global_goal = self.swarm.global_goal
-        subgoals = self.swarm.goals
-        subgoals = random.choices(subgoals, k = 2)
+        goals = self.swarm.goals.copy()
+        random.shuffle(goals)
 
-        new_info_from_memory = ""
-        new_subtasks = []
-        for goal in subgoals:
-            missing_information_list = self._analyse_report(global_goal, goal)
+        for _, goal in enumerate(goals):
+            idx = self.swarm.goals.index(goal)
+            report_json = self._get_report_json()
+
+            # find the goal. The format is the following: {1: {"Question": goal_i, "Answer": answer_i}, 2:...}
+            if idx in report_json:
+                prev_answer = report_json[idx]["Answer"]
+            else:
+                prev_answer = ""
+
+            missing_information_list = self._analyse_report(global_goal, goal, prev_answer)
+                
             for el in missing_information_list:
-                finding = self.shared_memory.ask_question(f"For the purpose of {global_goal}, try to find information about {el}. Summarise it shortly and indclude web-lins of sources. If nothing relevant is found, say 'no_info_found'. Be an extremely critical analyst! If you doubt the infirmation, say 'questionable_info'.")
-                if "no_info_found" in finding or "questionable_info" in finding:
-                    new_subtasks.append(('google_search', f"For the purpose of {goal}, find information about {el}", 50))
-                else:
-                    new_info_from_memory += f"Found {finding} about {el} for {goal}\n"
-            
-        if new_info_from_memory != "":
-            self._update_report(new_info_from_memory)
-        
-        if len(new_subtasks) > 0:
-            self._add_subtasks_to_task_queue(new_subtasks)
+                self._add_subtasks_to_task_queue([('google_search', f"For the purpose of {goal}, find information about {el}", 50)])
 
+            # update the report
+            info_from_memory = self.shared_memory.ask_question(f"For the purpose of {global_goal}, try to find information about {goal}. Summarise it shortly and indclude web-lins of sources. Be an extremely critical analyst!.") 
+            conversation = [
+                {"role": "system", "content": PromptFactory.StandardPrompts.summarisation_for_task_prompt },
+                {"role": "user", "content": info_from_memory + prev_answer + f"\nUsing all the info above answer the question:\n{goal}\n"},
+            ]
+            summary = self.engine.call_model(conversation)
 
-    def _analyse_report(self, global_goal, goal):
+            # add to the report
+            report_json = self._get_report_json()
+            report_json[idx] = {"Question": goal, "Answer": summary}
+            self.swarm.interact_with_output(json.dumps(report_json), method="write")
+
+        self.swarm.create_report_qa_task()
+
+    def _get_report_json(self):
+        report = self.swarm.interact_with_output("",  method="read")
+        if report == "":
+            report = "{}"
+        # parse json
+        report_json = json.loads(report)
+        return report_json
+
+    def _analyse_report(self, global_goal, goal, prev_answer):
         """Checks what information is missing in the report to solve the global task.
         """
-        report = self.swarm.interact_with_output("",  method="read") # report can be updated by other managers in the meantime
         prompt = (
-            f"Our global goal is:\n{global_goal}\n"
-            f"The following report was prepared to solve this goal:\n{report}\n"
-            f"Which information is missing in the report to solve the following subgoal:\n{goal}\n"
+            f"Our global goal is:\n{global_goal}\n\n"
+            f"The following answer was prepared to solve this goal:\n{prev_answer}\n\n"
+            f"Which information is missing in the report to solve the following subgoal:\n{goal}\n\n"
             f"If no information is missing or no extention possible, output: ['no_missing_info']"
-            f"Provide a list of specific points that are missing from the report to solve a our subgoal.\n"
+            f"Provide a list of specific points that are missing from the report to solve a our subgoal.\n\n"
         )
         conversation = [
             {"role": "user", "content": prompt},
@@ -188,26 +128,6 @@ class ManagerAgent(AgentBase):
             missing_information_list = missing_information_output.split(";")
 
         return missing_information_list
-
-    def _update_report(self, new_info_from_memory):
-        """Updates the report with the new information from the memory.
-        """
-        context = self.swarm.global_goal
-        prev_report = self.swarm.interact_with_output("",  method="read")
-        updated_report = []
-        for goal in self.swarm.goals:
-            info_from_memory = self.shared_memory.ask_question(f"For the purpose of {context}, find information about {goal}. Be very brief and concise. Focus on the essential information and provide https links to the sources.")
-            conversation = [
-                {"role": "system", "content": f"\nUsing all the info below answer the question {goal}\n\n\n" + PromptFactory.StandardPrompts.summarisation_for_task_prompt },
-                {"role": "user", "content": info_from_memory + new_info_from_memory + f"\nUsing all the info above answer the question:\n{goal}\n"},
-            ]
-            summary = self.engine.call_model(conversation)
-            updated_report.append({"Question": goal, "Answer": summary})
-        
-        updated_report = "["+",".join([json.dumps(i) for i in updated_report])+"]"
-
-        self.swarm.interact_with_output(updated_report, method="write")
-        self.swarm.create_report_qa_task()
 
     def _repair_json(self, text):
         """Reparing the output of the model to be a valid JSON.

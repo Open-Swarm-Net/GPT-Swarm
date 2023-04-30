@@ -5,8 +5,6 @@ import yaml
 import threading
 import os
 import json
-import dirtyjson
-from dirtyjson.attributed_containers import AttributedList, AttributedDict
 
 from pathlib import Path
 
@@ -217,7 +215,6 @@ class Swarm:
         """Writed/read the report file.
         Needed to do it as one method due to multithreading.
         """
-        message = message.replace("\\","")
         with self.lock:
             if method == "write":
                 # completely overwriting the file
@@ -227,9 +224,9 @@ class Swarm:
                 
                 # try to write it to json. can somtimes be malformated
                 out_json = str(self.output_file).replace(".txt", ".json")
+                message_dict = json.loads(message)
                 with open(out_json, "w") as f:
                     try:
-                        message_dict = self._shit_to_dict(message)
                         json.dump(message_dict, f, indent=4)
                     except:
                         pass
@@ -237,13 +234,12 @@ class Swarm:
 
                 # pretty output. take json and outpout it as a text but with sections
                 out_pretty = str(self.output_file).replace(".txt", "_pretty.txt")
-                json_content_dict = self._shit_to_dict(message)
                 with open(out_pretty, "w") as f:
-                    for _, value in json_content_dict.items():
+                    for _, value in message_dict.items():
                         f.write("========================================\n")
                         f.write("========================================\n")
                         for key, value in value.items():
-                            f.write(f"{key}: {value}\n")
+                            f.write(f"**{key}**:\n{value}\n\n")
                         f.write("\n")
 
                     f.close()
@@ -259,48 +255,6 @@ class Swarm:
 
             else:
                 raise ValueError(f"Unknown method {method}")
-
-    def _shit_to_dict(self, shit: str) -> dict:
-        """However you try, the model will most likely not return you a properly formatted json.
-        So we need to write a method to properly parse the text and display it.
-        https://github.com/codecobblers/dirtyjson
-
-        The output should be of the format:
-        {
-            1: {
-                "Question": xxx
-                "Answer": xxx
-                "Sources": xxx
-            },
-
-            2: ...
-        }
-        """
-        message_dict = dirtyjson.loads(shit)
-        if "Report" in message_dict:
-            message_dict = message_dict["Report"]
-        if "report" in message_dict:
-            message_dict = message_dict["report"]
-        try:
-            final_dict = {}
-            for idx, el in enumerate(message_dict):
-                final_dict[idx] = dict(el)
-
-            return final_dict
-        except:
-            pass
-        
-        try:
-            final_dict = dict(el)
-            if "Report" in final_dict:
-                final_dict = final_dict["Report"]
-            
-            return final_dict
-        except:
-            pass
-        
-        raise ValueError("The input is not json parsable")
-
 
 
     def log(self, message, level="info"):
