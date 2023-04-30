@@ -63,6 +63,9 @@ class GooglerAgent(AgentBase):
 
         self.log(message = f"Agent {self.agent_id} of type {self.agent_type} googled:\n{task_description}\n\nand got:\n{result}", level = "info")
 
+        # saving to the shared memory
+        self._send_data_to_swarm(result)
+
         return result
 
         

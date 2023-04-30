@@ -41,7 +41,7 @@ class GeneralPurposeAgent(AgentBase):
         prompt = (
             "Act as an analyst and worker."
             f"You need to perform a task: {task_description}. The type of the task is {self.task.task_type}."
-            "If you don't have capabilities to perform the task (for example no google access), image you do have them and submit the solution you would obtain in this case."
+            "If you don't have capabilities to perform the task (for example no google access), return empty string (or just a space)"
             "Make sure to actually solve the task and provide a valid solution; avoid describing how you would do it."
         )
         # generate a conversation

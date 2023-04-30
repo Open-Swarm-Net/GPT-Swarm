@@ -2,6 +2,7 @@ import os
 import openai
 import re
 import random
+import json
 
 from swarmai.agents.AgentBase import AgentBase
 from swarmai.utils.ai_engines.GPTConversEngine import GPTConversEngine
@@ -10,14 +11,11 @@ from swarmai.utils.PromptFactory import PromptFactory
 
 class ManagerAgent(AgentBase):
     """Manager agent class that is responsible for breaking down the tasks into subtasks and assigning them into the task queue.
-
-    Attributes:
-        - 
     """
 
     def __init__(self, agent_id, agent_type, swarm, logger):
         super().__init__(agent_id, agent_type, swarm, logger)
-        self.engine = GPTConversEngine("gpt-3.5-turbo", 0.5, 2000)
+        self.engine = GPTConversEngine("gpt-3.5-turbo", 0.25, 2000)
         
         self.TASK_METHODS = {
             Task.TaskTypes.report_preparation: self.report_preparation,
@@ -139,47 +137,36 @@ class ManagerAgent(AgentBase):
         """
         global_goal = self.swarm.global_goal
         subgoals = self.swarm.goals
-        random.shuffle(subgoals)
+        subgoals = random.choices(subgoals, k = 2)
 
-        report_ready = True
+        new_info_from_memory = ""
+        new_subtasks = []
         for goal in subgoals:
-            final_report = self.swarm.interact_with_output("",  method="read") # report can be updated by other managers in the meantime
-            new_info_from_memory = ""
-            new_subtasks = []
-            missing_information_list = self._analyse_report(final_report, global_goal, goal)
+            missing_information_list = self._analyse_report(global_goal, goal)
             for el in missing_information_list:
-                finding = self.shared_memory.ask_question(f"For the purpose of {global_goal}, try to find {el} in the memory. You must indclude web-lins of sources. If nothing relevant is found, say 'no_info_found'. Be an extremely critical analyst! If you doubt the infirmation, say 'questionable_info'.")
+                finding = self.shared_memory.ask_question(f"For the purpose of {global_goal}, try to find information about {el}. Summarise it shortly and indclude web-lins of sources. If nothing relevant is found, say 'no_info_found'. Be an extremely critical analyst! If you doubt the infirmation, say 'questionable_info'.")
                 if "no_info_found" in finding or "questionable_info" in finding:
                     new_subtasks.append(('google_search', f"For the purpose of {goal}, find information about {el}", 50))
                 else:
                     new_info_from_memory += f"Found {finding} about {el} for {goal}\n"
             
-            if new_info_from_memory != "":
-                report_ready = False
-                self._update_report(final_report, new_info_from_memory)
-            
-            if len(new_subtasks) > 0:
-                report_ready = False
-                self._add_subtasks_to_task_queue(new_subtasks)
-                
-
-        if report_ready:
-            self.swarm.stop()
-            return True
-        else:
-            self.swarm.create_report_qa_task()
+        if new_info_from_memory != "":
+            self._update_report(new_info_from_memory)
+        
+        if len(new_subtasks) > 0:
+            self._add_subtasks_to_task_queue(new_subtasks)
 
 
-    def _analyse_report(self, report, global_goal, goal):
+    def _analyse_report(self, global_goal, goal):
         """Checks what information is missing in the report to solve the global task.
         """
+        report = self.swarm.interact_with_output("",  method="read") # report can be updated by other managers in the meantime
         prompt = (
             f"Our global goal is:\n{global_goal}\n"
             f"The following report was prepared to solve this goal:\n{report}\n"
-            f"Which information is missing in the report to solve a specific subgoal:\n{goal}\n"
-            f"Provide 5 most crucial missing facts/information in the following format: ['info1'; 'info2'; ...]"
-            f"Also be very criticall! Add 5 additional points to the list that must be fact checked."
-            f"If no information is missing or no extention possible, you MUST output only: ['no_missing_info']"
+            f"Which information is missing in the report to solve the following subgoal:\n{goal}\n"
+            f"If no information is missing or no extention possible, output: ['no_missing_info']"
+            f"Provide a list of specific points that are missing from the report to solve a our subgoal.\n"
         )
         conversation = [
             {"role": "user", "content": prompt},
@@ -192,30 +179,48 @@ class ManagerAgent(AgentBase):
             return []
         missing_information_output = missing_information_output.group(0)
         missing_information_output = missing_information_output.replace("[", "").replace("]", "").replace("'", "").strip()
-        missing_information_list = missing_information_output.split(";")
+        missing_information_list = missing_information_output.split(",")
 
         if missing_information_list == ["no_missing_info"]:
             return []
+        
+        if len(missing_information_list) == 1:
+            missing_information_list = missing_information_output.split(";")
 
         return missing_information_list
 
-    def _update_report(self, report, new_info_from_memory):
+    def _update_report(self, new_info_from_memory):
         """Updates the report with the new information from the memory.
         """
-        prompt = (
-            f"Make the report as concise and brief (under 2000 tokens) focusing on the most important information and facts. Provide working links."
-            """The report must be in the following format as json with proper indentations: {[{"Question": "question1", "Answer": "answer1", "Sources": "web links of the sources"}]}"""
-            f"""Update the report with the new information. For the questions: {"//".join(self.swarm.goals)}"""
-            f"The following report was prepared:\n{report}\n"
-            f"The following new information was found:\n{new_info_from_memory}\n" # can get truncated
-        )
-        conversation = [
-            {"role": "user", "content": prompt},
-        ]
-        updated_report = self.engine.call_model(conversation)
+        context = self.swarm.global_goal
+        prev_report = self.swarm.interact_with_output("",  method="read")
+        updated_report = []
+        for goal in self.swarm.goals:
+            info_from_memory = self.shared_memory.ask_question(f"For the purpose of {context}, find information about {goal}. Be very brief and concise. Focus on the essential information and provide https links to the sources.")
+            conversation = [
+                {"role": "system", "content": f"\nUsing all the info below answer the question {goal}\n\n\n" + PromptFactory.StandardPrompts.summarisation_for_task_prompt },
+                {"role": "user", "content": info_from_memory + new_info_from_memory + f"\nUsing all the info above answer the question:\n{goal}\n"},
+            ]
+            summary = self.engine.call_model(conversation)
+            updated_report.append({"Question": goal, "Answer": summary})
+        
+        updated_report = "["+",".join([json.dumps(i) for i in updated_report])+"]"
 
         self.swarm.interact_with_output(updated_report, method="write")
         self.swarm.create_report_qa_task()
+
+    def _repair_json(self, text):
+        """Reparing the output of the model to be a valid JSON.
+        """
+        prompt = (
+            "Act as a professional json repairer. Repair the following JSON if needed to make sure it conform to the correct json formatting.\n"
+            "Make sure it's a single valid JSON object.\n"
+            """The report ABSOLUTELY MUST be in the following JSON format:  {[{"Question": "question1", "Answer": "answer1", "Sources": "web links of the sources"}, {"Question": "question2", "Answer": "answer2", "Sources": "web links of the sources"},...]}"""
+        )
+        conversation = [
+            {"role": "user", "content": prompt+text},
+        ]
+        return self.engine.call_model(conversation)
 
     def breakdown_to_subtasks(self, main_task_description):
         """Breaks down the main task into subtasks and adds them to the task queue.

@@ -20,6 +20,7 @@ class Task:
         summarisation = "summarisation"
         analysis = "analysis"
         report_preparation = "report_preparation"
+        crunchbase_search = "crunchbase_search"
 
     def __init__(self, priority, task_type, task_description, status="pending", task_id=uuid.uuid4()):
         self.task_id = task_id

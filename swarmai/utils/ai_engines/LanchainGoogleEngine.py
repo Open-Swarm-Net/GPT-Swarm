@@ -39,7 +39,6 @@ class LanchainGoogleEngine(EngineBase):
         self.agent = self._init_chain()
         self.search = GoogleSearchAPIWrapper()
 
-
     def _init_chain(self):
         """Instantiates langchain chain with all the necessary tools
         """
@@ -70,11 +69,10 @@ class LanchainGoogleEngine(EngineBase):
         response = self.search.run(query)
         return response
     
-    def search_sources(self, query: str, n=5) -> str:
+    def search_sources(self, query: str, n=5):
         """Does the search itself but provides very short answers!
         """
         response = self.search.results(query, n)
-        response = response.__repr__()
         return response
     
     def _convert_conversation_to_str(self, conversation):

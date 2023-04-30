@@ -1,11 +1,13 @@
 swarm:
-  agents: # supported: manager, analyst, googler
+  agents: # supported: manager, analyst, googler, crunchbase_searcher
     - type: manager
-      n: 2
+      n: 8
     - type: analyst
-      n: 2
+      n: 10
     - type: googler
-      n: 2
+      n: 50
+    - type: crunchbase_searcher # scraper can only have one job in parallel
+      n: 1
   timeout_min: 10
   run_dir: ./tmp/swarm
 task:
