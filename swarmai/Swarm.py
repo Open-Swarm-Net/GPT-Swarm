@@ -5,6 +5,7 @@ import yaml
 import threading
 import os
 import json
+import shutil
 
 from pathlib import Path
 
@@ -80,6 +81,16 @@ class Swarm:
         self.output_file = str((self.data_dir / 'output.txt').resolve())
         with open(self.output_file, 'w') as f:
             f.write("")
+        
+        out_json = Path(str(self.output_file).replace(".txt", ".json"))
+        if out_json.exists():
+            with open(self.output_file, 'w') as f:
+                f.write("")
+        
+        out_pretty = Path(str(self.output_file).replace(".txt", "_pretty.txt"))
+        if out_pretty.exists():
+            with open(self.output_file, 'w') as f:
+                f.write("")
 
         # creating task queue
         self.task_queue = PandasQueue(self.TASK_TYPES, self.WORKER_ROLES.keys(), self.TASK_ASSOCIATIONS)
@@ -204,6 +215,13 @@ class Swarm:
         self.timeout = config["swarm"]["timeout_min"]*60
         
         self.data_dir = Path(".", config["swarm"]["run_dir"]).resolve()
+        # first, try to delete the directory with all the data
+        try:
+            for dir_i in self.data_dir.iterdir():
+                shutil.rmtree(dir_i)
+        except Exception:
+            pass
+
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         # getting the tasks

@@ -3,12 +3,12 @@ pandas
 ipykernel
 openai
 tqdm
-langchain
+langchain==0.0.133
 PyYAML
 matplotlib
 seaborn
 tiktoken
-chromadb
+chromadb==0.3.21
 google-api-python-client
 apify-client
 dirtyjson

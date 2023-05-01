@@ -7,6 +7,9 @@
   <img src="content/logo_midjourney.png" alt="Project logo" width="1080">
 </p>
 
+[Videos submission for the lablab hackathon](https://lablab.ai/event/autonomous-gpt-agents-hackathon/autoswarm/gpt-swarm)\
+[Simple frontend demo](https://huggingface.co/spaces/alex-mindspace/gpt-agents)
+
 GPT-Swarm is a groundbreaking project that combines swarm intelligence and advanced language models to tackle complex tasks across diverse domains. Our innovative framework is robust, adaptive, and scalable, outperforming single models by leveraging the power of collective problem-solving and distributed decision-making. Not to mention the lightning-fast speed with which it performs the research.
 
 

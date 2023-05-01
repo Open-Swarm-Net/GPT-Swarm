@@ -77,6 +77,8 @@ class ManagerAgent(AgentBase):
 
             # update the report
             info_from_memory = self.shared_memory.ask_question(f"For the purpose of {global_goal}, try to find information about {goal}. Summarise it shortly and indclude web-lins of sources. Be an extremely critical analyst!.") 
+            if info_from_memory is None:
+                info_from_memory = ""
             conversation = [
                 {"role": "system", "content": PromptFactory.StandardPrompts.summarisation_for_task_prompt },
                 {"role": "user", "content": info_from_memory + prev_answer + f"\nUsing all the info above answer the question:\n{goal}\n"},
