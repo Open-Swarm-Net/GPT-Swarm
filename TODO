@@ -1,11 +1,11 @@
 Todo:
-- website parser
 - add logger to the task queue
 
 Bugs:
-- Agentbase sometimes doesn't have task when _submit_complete_task is run
+- logging incorrectly parses the stage of the agent always printing 'init'
 
 Done:
+- website parser
 - regular report qa => new task for the manager
 - input/output
 - find a good challenge that showcases the capabilities

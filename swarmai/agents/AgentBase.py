@@ -60,16 +60,13 @@ class AgentBase(ABC, threading.Thread):
         while self.ifRun:
             while self.task is None:
                 self._get_task() # gets the task from the task queue
-                if self.task is None:
+                if self.task  is None:
                     time.sleep(15)
 
             self.job = AgentJob(self.agent_iteration, ())
             self.job.name = f"Agent {self.agent_id}, cycle {self.cycle}"
             self.job.start()
-            if self.agent_type=="manager":
-                self.job.join()
-            else:
-                self.job.join(timeout = 120)
+            self.job.join(timeout=600)
 
             # there is no deadlock, but the agetns sometimes submit code with infinite loops, so need to kill the jobs
             if self.job.is_alive():
@@ -88,11 +85,6 @@ class AgentBase(ABC, threading.Thread):
             self._submit_complete_task()
         else:
             self._reset_task()
-
-    def terminate(self):
-        """Terminate the agent
-        """
-        self.ifRun = False
 
     @abstractmethod
     def perform_task(self):
@@ -133,17 +125,17 @@ class AgentBase(ABC, threading.Thread):
         """Gets the task from the task queue.
         It's not the job of the agent to decide which task to perform, it's the job of the task queue.
         """        
-        task = self.task_queue.get_task(self)
-        if task is not None:
-            self.log(f"Got task: {task.task_id}", level = "debug")
+        self.task = self.task_queue.get_task(self)
+        if not isinstance(self.task, Task):
+            self.task = None
+            return
+
+        if self.task is not None:
+            self.log(f"Got task: {self.task.task_id}", level = "debug")
         else:
             self.log(f"No task found. Waiting for the proper task", level = "debug")
-            return None
+            self.task = None
 
-        if not isinstance(task, Task):
-            raise ValueError("The task is not a Task implementation.")
-        
-        self.task = task
 
     def _process_message(self, message):
         """Process the message from the neighbor.

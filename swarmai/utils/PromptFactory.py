@@ -49,7 +49,7 @@ class PromptFactory:
 
         task_breakdown=(
             "Given a task and a list of possible subtask types, breakdown a general task in the list of at most 5 subtasks that would help to solve the main task."
-            "Don't repeat the tasks, be as specific as possible, include only the most important subtasks. Avoid a lot of breakdown tasks and limit it to 2-3 layers max."
+            "Don't repeat the tasks, be as specific as possible, include only the most important subtasks. Avoid infinite breakdown tasks."
             "The output should be formatted in a way that is easily parsable in Python, using separators to enclose the subtask type and task description."
         )
 
@@ -62,8 +62,7 @@ class PromptFactory:
             "You will be presented with a global task and some information obtained during the research."
             "You task is to summarise the information based on the global task."
             "Be extremely brief and concise. Focus only on the information relevant to the task."
-            "You MUST tag your otput for easier vector search. For example, if the task is to find the competitoris prepend the output with 'Competitors', 'Competitor analysis', 'Competitor research' etc."
-        ) + tagging_prompt
+        )
 
         google_search_config_prompt = (
             "You will be presented with a global mission and a single research task."

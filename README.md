@@ -24,7 +24,7 @@ GPT-Swarm is a groundbreaking project that combines swarm intelligence and advan
 GPT-Swarm is inspired by the principles of emergence. In nature, when you allow simple agents to interract with each other, they show fundamentally new capabilities. Typical examples are bee or ant hives, or even countries and cultures.
 
 ## Uprecedented Scalability and Diversity
-You can add any models
+You can add any models with any capabilities to the swarm and make them work together with each other.
 
 ## Adaptive Intelligence without Retraining
 By utilizing shared vector-based memory, and giving the swarm the ability to adjust itself and it's behavior, we achieve similar adaptability as in reinforcement learning, but without expensive retraining of base-models.
@@ -73,6 +73,11 @@ Swarm is the only intelligence system to date that can effectively do complex ta
 5. If you are brave, you can go though the logs. Be careful, because the swarm produces incredible amount of data very fast. You can find logs in `./tmp/swarm/swarm.json`. You can also use `./tests/_explore_logs.ipynb` to more easily digest the logs.
 
 6. The shared memory in the run is persistent. You can ask additional questions to this memory using `./tests/_task_to_vdb.ipynb`
+
+# Next-ups
+
+- make adding new models as easy as possible, including custom deployed ones like llama
+- multi-key support for higher scalability
 
 # 🚧 Docker
 Build Multi-Arch image:

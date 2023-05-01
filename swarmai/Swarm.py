@@ -4,6 +4,7 @@ import time
 import yaml
 import threading
 import os
+import json
 
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from swarmai.utils.memory import VectorMemory
 from swarmai.utils.task_queue.PandasQueue import PandasQueue
 from swarmai.utils.task_queue.Task import Task
 
-from swarmai.agents import ManagerAgent, GeneralPurposeAgent, GooglerAgent
+from swarmai.agents import ManagerAgent, GeneralPurposeAgent, GooglerAgent, CrunchbaseSearcher
 
 class Swarm:
     """This class is responsible for managing the swarm of agents.
@@ -46,20 +47,22 @@ class Swarm:
         "manager": ManagerAgent,
         "googler": GooglerAgent,
         "analyst": GeneralPurposeAgent,
+        "crunchbase_searcher": CrunchbaseSearcher
     }
 
     TASK_TYPES = [
-        Task.TaskTypes.summarisation,
         Task.TaskTypes.breakdown_to_subtasks,
         Task.TaskTypes.google_search,
         Task.TaskTypes.analysis,
-        Task.TaskTypes.report_preparation
+        Task.TaskTypes.report_preparation,
+        Task.TaskTypes.crunchbase_search
     ]
 
     TASK_ASSOCIATIONS = {
         "manager": [Task.TaskTypes.breakdown_to_subtasks, Task.TaskTypes.report_preparation],
         "googler": [Task.TaskTypes.google_search],
-        "analyst": [Task.TaskTypes.summarisation, Task.TaskTypes.analysis, Task.TaskTypes.google_search]
+        "analyst": [Task.TaskTypes.analysis],
+        "crunchbase_searcher": [Task.TaskTypes.crunchbase_search]
     }
 
     def __init__(self, swarm_config_loc):
@@ -74,7 +77,7 @@ class Swarm:
         # creating shared memory
         self.shared_memory_file = self.data_dir / 'shared_memory'
         self.shared_memory = VectorMemory(self.shared_memory_file)
-        self.output_file = self.data_dir / 'output.txt'
+        self.output_file = str((self.data_dir / 'output.txt').resolve())
         with open(self.output_file, 'w') as f:
             f.write("")
 
@@ -98,9 +101,8 @@ class Swarm:
         counter = 0
         for key, val in self.agent_role_distribution.items():
             agent_role = key
-            # if GOOGLE_API_KEY and GOOGLE_CSE_ID are not in os.environ, then the googler agent will be treated as a general purpose agent
-            if agent_role == "googler" and ("GOOGLE_API_KEY" not in os.environ or "GOOGLE_CSE_ID" not in os.environ):
-                agent_role = "analyst"
+            agent_role = self._check_keys_and_agents(agent_role)
+            
             n = val
             for _ in range(n):
                 agent_id = counter
@@ -114,6 +116,14 @@ class Swarm:
           
         return np.array(agents)
 
+    def _check_keys_and_agents(self, agent_role):
+        # if GOOGLE_API_KEY and GOOGLE_CSE_ID are not in os.environ, then the googler agent will be treated as a general purpose agent
+        if agent_role == "googler" and ("GOOGLE_API_KEY" not in os.environ or "GOOGLE_CSE_ID" not in os.environ):
+            agent_role = "analyst"
+
+        return agent_role
+
+
     def run_swarm(self):
         """Runs the swarm for a given number of cycles or until the termination condition is met.
         """
@@ -126,8 +136,7 @@ class Swarm:
                 task_description=f"Act as:\n{self.role}Gloabl goal:\n{self.global_goal}\nYour specific task is:\n{self.goals[i]}"
             )
             self.task_queue.add_task(task_i)
-
-        self.create_report_qa_task()
+            self.create_report_qa_task()
 
         # start the agents
         for agent in self.agents:
@@ -194,7 +203,7 @@ class Swarm:
         
         self.timeout = config["swarm"]["timeout_min"]*60
         
-        self.data_dir = Path(".", config["swarm"]["run_dir"])
+        self.data_dir = Path(".", config["swarm"]["run_dir"]).resolve()
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         # getting the tasks
@@ -212,7 +221,30 @@ class Swarm:
                 with open(self.output_file, "w") as f:
                     f.write(message)
                     f.close()
-                    return message
+                
+                # try to write it to json. can somtimes be malformated
+                out_json = str(self.output_file).replace(".txt", ".json")
+                message_dict = json.loads(message)
+                with open(out_json, "w") as f:
+                    try:
+                        json.dump(message_dict, f, indent=4)
+                    except:
+                        pass
+                    f.close()
+
+                # pretty output. take json and outpout it as a text but with sections
+                out_pretty = str(self.output_file).replace(".txt", "_pretty.txt")
+                with open(out_pretty, "w") as f:
+                    for _, value in message_dict.items():
+                        f.write("========================================\n")
+                        f.write("========================================\n")
+                        for key, value in value.items():
+                            f.write(f"**{key}**:\n{value}\n\n")
+                        f.write("\n")
+
+                    f.close()
+
+                return message
                 
             elif method == "read":
                 # reading the report file
@@ -223,6 +255,7 @@ class Swarm:
 
             else:
                 raise ValueError(f"Unknown method {method}")
+
 
     def log(self, message, level="info"):
         level = level.lower()

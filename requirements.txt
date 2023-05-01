@@ -10,3 +10,5 @@ seaborn
 tiktoken
 chromadb
 google-api-python-client
+apify-client
+dirtyjson

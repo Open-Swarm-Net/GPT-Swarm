@@ -38,6 +38,10 @@ class CustomLogger(logging.Logger):
         self.log_folder.mkdir(parents=True, exist_ok=True)
 
         log_file = f"{self.log_folder}/swarm.json"
+        # write empty string to the log file to clear it
+        with open(log_file, "w") as f:
+            f.write("")
+            f.close()
 
         # Create a custom logger instance and configure it
         self.log_file = log_file

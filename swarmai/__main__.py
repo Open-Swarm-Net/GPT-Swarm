@@ -18,6 +18,10 @@ def load_keys():
     except:
         print("WARNING: GOOGLE_API_KEY and GOOGLE_CSE_ID not found in keys.json. Googler agent will be treated as a general purpose agent.")
 
+    try:
+        os.environ["APIFY_API_TOKEN"] = keys["APIFY_API_TOKEN"]
+    except:
+        print("WARNING: APIFY_API_TOKEN not found in keys.json. WebScraper agent will not work.")
 
 def run_swarm(swarm_config_loc):
     # establishing the swarm
