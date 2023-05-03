@@ -16,18 +16,16 @@ GPT-Swarm is a groundbreaking project that combines swarm intelligence and advan
 
 ## Table of Contents
 
-- [Principles](#principles)
 - [Why](#why)
 - [Architecture Overview](#architecture-overview)
-- [Installation and Usage](#installation-an-usage)
-- [Documentation](#documentation)
+- [Installation and Usage](#installation-and-usage)
 - [How to Contribute](#how-to-contribute)
 
 # Why
 ## What Swarm Intelligence Is
-GPT-Swarm is inspired by the principles of emergence. In nature, when you allow simple agents to interract with each other, they show fundamentally new capabilities. Typical examples are bee or ant hives, or even countries and cultures.
+GPT-Swarm is inspired by the principles of emergence. In nature, when you allow simple agents to interract with each other, they show fundamentally new capabilities. Typical examples are bees or ant hives, or even countries and cultures.
 
-## Uprecedented Scalability and Diversity
+## Unprecedented Scalability and Diversity
 You can add any models with any capabilities to the swarm and make them work together with each other.
 
 ## Adaptive Intelligence without Retraining
@@ -50,7 +48,7 @@ Swarm is the only intelligence system to date that can effectively do complex ta
 
 # Installation and Usage
 
-1. First, you need to create a keys.json file in the root foler. GOOGLE_API_KEY and CUSTOM_SEARCH_ENGINE_ID are needed for the models to be able to use google search.
+1. First, you need to create a `keys.json` file in the root folder. `GOOGLE_API_KEY` and `CUSTOM_SEARCH_ENGINE_ID` are needed for the models to be able to use google search.
     ```json
     {
         "OPENAI_API_KEY": "sk-YoUrKey",
@@ -80,8 +78,8 @@ Swarm is the only intelligence system to date that can effectively do complex ta
 
 # Next-ups
 
-- make adding new models as easy as possible, including custom deployed ones like llama
-- multi-key support for higher scalability
+- Make adding new models as easy as possible, including custom deployed ones like llama
+- Multi-key support for higher scalability
 
 # 🚧 Docker
 Build Multi-Arch image:
@@ -91,5 +89,5 @@ docker buildx build --platform linux/amd64,linux/arm64 --tag gpt-swarm/gpt-swarm
 ```
 
 # How to Contribute
-- follow the SOLID principles and don't break the abstractions
-- create bite-sized PRs
+- Follow the SOLID principles and don't break the abstractions
+- Create bite-sized PRs
