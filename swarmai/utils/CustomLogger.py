@@ -16,6 +16,8 @@ class CustomFormatter(logging.Formatter):
         
         if 'agent_id' not in record_content:
             record_content["agent_id"] = -1
+        if 'agent_type' not in record_content:
+            record_content["agent_type"] = -1
         if 'cycle' not in record_content:
             record_content["cycle"] = -1
         if 'step' not in record_content:
@@ -25,6 +27,7 @@ class CustomFormatter(logging.Formatter):
             'time': self.formatTime(record, self.datefmt),
             'level': record.levelname,
             'agent_id': record_content["agent_id"],
+            'agent_type': record_content["agent_type"],
             'cycle': record_content["cycle"],
             'step': record_content["step"],
             'message': message
@@ -59,3 +62,11 @@ class CustomLogger(logging.Logger):
         ch.setLevel(logging.INFO)
         ch.setFormatter(formatter)
         self.addHandler(ch)
+
+        # # Add a CSV file handler to log messages in CSV format
+        # csv_file = f"{self.log_folder}/swarm.csv"
+        # csv_formatter = logging.Formatter('%(asctime)s,%(levelname)s,%(agent_id)s,%(agent_type)s,%(cycle)s,%(step)s,%(message)s')
+        # csv_handler = logging.FileHandler(csv_file)
+        # csv_handler.setFormatter(csv_formatter)
+        # csv_handler.setLevel(logging.DEBUG)
+        # self.addHandler(csv_handler)

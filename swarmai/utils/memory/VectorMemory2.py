@@ -80,9 +80,8 @@ class VectorMemory:
         if k <= 0:
             return None
 
-        fetch_k = min(20, self.count)
         if type == "mmr":
-            texts = self.db.max_marginal_relevance_search(query=query, k=k, fetch_k=fetch_k)
+            texts = self.db.max_marginal_relevance_search(query=query, k=k, fetch_k = min(20,self.count))
             texts = [text.page_content for text in texts]
         elif type == "cos":
             texts = self.db.similarity_search_with_score(query=query, k=k)
