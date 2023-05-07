@@ -166,3 +166,5 @@ Temporary Items
 ### macOS Patch ###
 # iCloud generated files
 *.icloud
+_files/
+.gptignore
