@@ -59,7 +59,7 @@ class CustomLogger(logging.Logger):
         self.addHandler(fh)
 
         ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
+        ch.setLevel(logging.DEBUG)
         ch.setFormatter(formatter)
         self.addHandler(ch)
 

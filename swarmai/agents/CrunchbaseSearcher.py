@@ -41,6 +41,8 @@ class CrunchbaseSearcher(AgentBase):
 
     def domain_specific_search(self, task_description):
         self.step = "crunchbase_search"
+        self.log(message=f"Agent {self.agent_id} of type {self.agent_type} is starting Crunchbase search for: {task_description}", level="debug")
+
 
         prompt = (
             f"based on the task description:\n{task_description}\n\ngenerate a short google search query under 5 words to find relevant companies on Crunchbase"
@@ -72,8 +74,9 @@ class CrunchbaseSearcher(AgentBase):
             company_infos += self._get_crunchbase_data(link)
 
         self._send_data_to_swarm(company_infos)
-        self.log(message = f"Agent {self.agent_id} of type {self.agent_type} search:\n{task_description}\n\nand got:\n{company_infos}", level = "info")
+        # self.log(message = f"Agent {self.agent_id} of type {self.agent_type} search:\n{task_description}\n\nand got:\n{company_infos}", level = "info")
 
+        self.log(message=f"Agent {self.agent_id} of type {self.agent_type} finished Crunchbase search and got:\n{company_infos}", level="debug")
         return company_infos
 
     def _get_crunchbase_data(self, url):

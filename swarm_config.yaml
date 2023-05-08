@@ -14,14 +14,19 @@ task:
   role: |
     senior analyst manager in the venture capital/family office field, who has a proven track record of consistently funding successful startups
   global_goal: |
-    A new startup just send us their pitch. Find if the startup is worth investing in. The startup is called Chia and it is in the  decentralized storage network. 
-    More information about them 'https://www.chia.net/', 'https://www.linkedin.com/company/chia-network/', https://www.crunchbase.com/organization/chia-network
+    A good startup just send us their pitch. Find if the startup is worth investing in. The startup is called RapidApi Rapid delivers the next-generation API platform that enables developers to build, use and share APIs.
+    More information about them 'https://rapidapi.com', 'https://www.linkedin.com/company/rapidapi/', 'https://www.crunchbase.com/organization/rapidapi'
   goals:
+    - Generate a comprehensive description of the startup. Describe their value proposition,
+      the product, USP and business model of a startup.
+    - Find any mentions of the startup in the news, social media, etc. Add links.
     - Find top 10 companies and startups in this field. Find out their locations, raised funding, value proposition, differentiation. Could you Please put the result into table with following columns 1. Title 2. URL 3. Description (up to 8 words) 4. Founders. If known. 5. Year of Foundation. If known. 6. Country of Foundation. If known. 7. Investments if known 8. Why this service is better than others?  (up to 8 words) 9. value proposition, 10. differentiation
     - Find top 5 investors in this field. Includ specific details in the format of 'company AAA (link) invested in company BBB (link) $XX in year YYYY' Could you Please put the result into table with following columns 1. Investor, 2. Company, 3. Invest amount if known, 4. Year  if known, 5. Any other details if known
-    # - Generate a comprehensive description of the startup. Describe their value proposition, the product, USP and business model of a startup.
-    # - Find any mentions of the startup in the news, social media, etc. Add links.
-    # - Describe the market size, growth rate and trends of this field.
-    # - Main problems and challenges of the field. Create an extensive list of problems. What can stop the field from growing? What can stop the company from succeeding?
-    # - Briefly describe the technology for the non-tech audience. Include links to the main articles in the field.
-    # - What questions should we ask the startup to make a more informed decision? Avoid generic and obvious questions and focus on field/domain specific questions that can uncover problems with this specific startup.
+    - Describe the market size, growth rate and trends of this field.
+    - Main problems and challenges of the field. Create an extensive list of problems.
+      What can stop the field from growing? What can stop the company from succeeding?
+    - Briefly describe the technology for the non-tech audience. Include links to the
+      main articles in the field.
+    - What questions should we ask the startup to make a more informed decision? Avoid
+      generic and obvious questions and focus on field/domain specific questions that
+      can uncover problems with this specific startup.

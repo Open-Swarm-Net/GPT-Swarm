@@ -1,20 +1,17 @@
 import numpy as np
-from datetime import datetime
 import time
 import yaml
 import threading
 import os
 import json
 import shutil
+from datetime import datetime
 
 from pathlib import Path
-
 from swarmai.utils.CustomLogger import CustomLogger
-
 from swarmai.utils.memory import VectorMemory
 from swarmai.utils.task_queue.PandasQueue import PandasQueue
 from swarmai.utils.task_queue.Task import Task
-
 from swarmai.agents import ManagerAgent, GeneralPurposeAgent, GooglerAgent, CrunchbaseSearcher
 
 class Swarm:
@@ -274,7 +271,6 @@ class Swarm:
             else:
                 raise ValueError(f"Unknown method {method}")
 
-
     def log(self, message, level="info"):
         level = level.lower()
         if level == "info":
@@ -290,4 +286,3 @@ class Swarm:
         else:
             level = 0
         self.logger.log(level=level, msg= {'message': message})
-

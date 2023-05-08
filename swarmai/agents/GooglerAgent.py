@@ -38,6 +38,8 @@ class GooglerAgent(AgentBase):
 
     def google(self, task_description):
         self.step = "google"
+        self.log(message=f"Agent {self.agent_id} of type {self.agent_type} is starting to google: {task_description}", level="debug")
+
 
         # just googling
         system_prompt = PromptFactory.StandardPrompts.google_search_config_prompt
@@ -65,7 +67,8 @@ class GooglerAgent(AgentBase):
 
         # saving to the shared memory
         self._send_data_to_swarm(result)
-
+        
+        self.log(message=f"Agent {self.agent_id} of type {self.agent_type} finished googling and got:\n{result}", level="debug")
         return result
 
         
