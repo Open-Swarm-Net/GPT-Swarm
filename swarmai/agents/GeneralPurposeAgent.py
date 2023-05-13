@@ -12,7 +12,7 @@ class GeneralPurposeAgent(AgentBase):
         self.engine = GPTConversEngine("gpt-3.5-turbo", 0.5, 1000)
         
         self.TASK_METHODS = {}
-        for method in self.swarm.TASK_TYPES:
+        for method in self.swarm.tasks_in_use:
             if method != "breakdown_to_subtasks":
                 self.TASK_METHODS[method] = self._think
 

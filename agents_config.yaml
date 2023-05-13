@@ -1,0 +1,14 @@
+agents:
+  - name: manager
+    tasks:
+      - breakdown_to_subtasks
+      - report_preparation
+  - name: googler
+    tasks:
+      - google_search
+  - name: analyst
+    tasks:
+      - analysis
+  - name: crunchbase_searcher
+    tasks:
+      - crunchbase_search

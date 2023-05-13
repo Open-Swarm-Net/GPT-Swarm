@@ -22,6 +22,9 @@ class Task:
         report_preparation = "report_preparation"
         crunchbase_search = "crunchbase_search"
 
+        @classmethod
+        def get_all_task_types(cls):
+            return [a for a in dir(cls) if not a.startswith('__')]
     def __init__(self, priority, task_type, task_description, status="pending", task_id=uuid.uuid4()):
         self.task_id = task_id
         self.priority = priority

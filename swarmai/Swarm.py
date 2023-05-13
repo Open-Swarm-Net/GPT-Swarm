@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import numpy as np
 from datetime import datetime
 import time
@@ -15,7 +17,8 @@ from swarmai.utils.memory import VectorMemory
 from swarmai.utils.task_queue.PandasQueue import PandasQueue
 from swarmai.utils.task_queue.Task import Task
 
-from swarmai.agents import ManagerAgent, GeneralPurposeAgent, GooglerAgent, CrunchbaseSearcher
+from swarmai.agents import AGENT_ROLES
+
 
 class Swarm:
     """This class is responsible for managing the swarm of agents.
@@ -44,36 +47,18 @@ class Swarm:
         - vector database for the shared memory
     """
 
-    WORKER_ROLES = {
-        "manager": ManagerAgent,
-        "googler": GooglerAgent,
-        "analyst": GeneralPurposeAgent,
-        "crunchbase_searcher": CrunchbaseSearcher
-    }
-
-    TASK_TYPES = [
-        Task.TaskTypes.breakdown_to_subtasks,
-        Task.TaskTypes.google_search,
-        Task.TaskTypes.analysis,
-        Task.TaskTypes.report_preparation,
-        Task.TaskTypes.crunchbase_search
-    ]
-
-    TASK_ASSOCIATIONS = {
-        "manager": [Task.TaskTypes.breakdown_to_subtasks, Task.TaskTypes.report_preparation],
-        "googler": [Task.TaskTypes.google_search],
-        "analyst": [Task.TaskTypes.analysis],
-        "crunchbase_searcher": [Task.TaskTypes.crunchbase_search]
-    }
-
-    def __init__(self, swarm_config_loc):
+    def __init__(self, swarm_config_loc, agents_config_loc):
         """Initializes the swarm.
 
         Args:
-            agent_role_distribution (dict): The dictionary that maps the agent roles to the weight of agents with that role
+            swarm_config_loc (str): Path to the swarm config file, which contains the swarm parameters.
+            agents_config_loc (str): Path to the agents config file, which contains the agents parameters.
         """
+
         self.swarm_config_loc = swarm_config_loc
+        self.agents_config_loc = agents_config_loc
         self._parse_swarm_config()
+        self._parse_agents_config()
 
         # creating shared memory
         self.shared_memory_file = self.data_dir / 'shared_memory'
@@ -81,26 +66,26 @@ class Swarm:
         self.output_file = str((self.data_dir / 'output.txt').resolve())
         with open(self.output_file, 'w') as f:
             f.write("")
-        
+
         out_json = Path(str(self.output_file).replace(".txt", ".json"))
         if out_json.exists():
             with open(self.output_file, 'w') as f:
                 f.write("")
-        
+
         out_pretty = Path(str(self.output_file).replace(".txt", "_pretty.txt"))
         if out_pretty.exists():
             with open(self.output_file, 'w') as f:
                 f.write("")
 
         # creating task queue
-        self.task_queue = PandasQueue(self.TASK_TYPES, self.WORKER_ROLES.keys(), self.TASK_ASSOCIATIONS)
+        self.task_queue = PandasQueue(self.tasks_in_use, self.agents_in_use, self.task_associations)
 
         # creating the logger
         self.logger = CustomLogger(self.data_dir)
 
         # creating agents
         self.agents_ids = []
-        self.agents = self._create_agents() # returns just a list of agents
+        self.agents = self._create_agents()  # returns just a list of agents
 
         # get a lock
         self.lock = threading.Lock()
@@ -113,18 +98,18 @@ class Swarm:
         for key, val in self.agent_role_distribution.items():
             agent_role = key
             agent_role = self._check_keys_and_agents(agent_role)
-            
+
             n = val
             for _ in range(n):
                 agent_id = counter
                 counter += 1
                 # need each agent to have its own challenge instance, because sometimes the agens submit the answers with infinite loops
                 # also included a timeout for the agent's computation in the AgentBase class
-                agents.append(self.WORKER_ROLES[agent_role](agent_id, agent_role, self, self.logger))
+                agents.append(AGENT_ROLES[agent_role](agent_id, agent_role, self, self.logger))
                 self.agents_ids.append(agent_id)
 
         self.log(f"Created {len(agents)} agents with roles: {[agent.agent_type for agent in agents]}")
-          
+
         return np.array(agents)
 
     def _check_keys_and_agents(self, agent_role):
@@ -133,7 +118,6 @@ class Swarm:
             agent_role = "analyst"
 
         return agent_role
-
 
     def run_swarm(self):
         """Runs the swarm for a given number of cycles or until the termination condition is met.
@@ -152,7 +136,7 @@ class Swarm:
         # start the agents
         for agent in self.agents:
             agent.max_cycles = 50
-            agent.name = f"Agent {agent.agent_id}" # inherited from threading.Thread => thread name
+            agent.name = f"Agent {agent.agent_id}"  # inherited from threading.Thread => thread name
             self.log(f"Starting agent {agent.agent_id} with type {agent.agent_type}")
             agent.start()
 
@@ -181,6 +165,58 @@ class Swarm:
             agent.ifRun = False
         for agent in self.agents:
             agent.join()
+
+    def _parse_agents_config(self):
+        """Parses the agents configuration file and setup it's tasks
+
+        agents:
+          - name: manager
+            tasks:
+              - breakdown_to_subtasks
+              - report_preparation
+          - name: googler
+            tasks:
+              - google_search
+          - name: analyst
+            tasks:
+              - analysis
+          - name: crunchbase_searcher
+            tasks:
+              - crunchbase_search
+
+        """
+
+        file = self.agents_config_loc
+        with open(file, "r") as f:
+            config = yaml.safe_load(f)
+
+        agents_in_use = []
+        tasks_in_use = []
+        task_associations = defaultdict(list)
+
+        all_task_types = Task.TaskTypes.get_all_task_types()
+        all_agent_roles = AGENT_ROLES.keys()
+
+        for agent in config["agents"]:
+            agent_name = agent["name"]
+            if agent_name not in all_agent_roles:
+                raise ValueError(f"Agent {agent_name} is not supported. Supported agents are: {all_agent_roles}")
+            agents_in_use.append(agent["name"])
+            for agent_task in agent["tasks"]:
+                if agent_task not in all_task_types:
+                    raise ValueError(f"Task {agent_task} is not supported. Supported tasks are: {all_task_types}")
+                tasks_in_use.append(agent_task)
+                task_associations[agent_task].append(agent_name)
+
+        if len(agents_in_use) == 0:
+            raise ValueError(f"No agents are specified in the config file {file}")
+
+        if len(tasks_in_use) == 0:
+            raise ValueError(f"No tasks are specified in the config file {file}")
+
+        self.agents_in_use = agents_in_use
+        self.tasks_in_use = tasks_in_use
+        self.task_associations = task_associations
 
     def _parse_swarm_config(self):
         """Parses the swarm configuration file and returns the agent role distribution.
@@ -211,9 +247,9 @@ class Swarm:
         self.agent_role_distribution = {}
         for agent in config["swarm"]["agents"]:
             self.agent_role_distribution[agent["type"]] = agent["n"]
-        
-        self.timeout = config["swarm"]["timeout_min"]*60
-        
+
+        self.timeout = config["swarm"]["timeout_min"] * 60
+
         self.data_dir = Path(".", config["swarm"]["run_dir"]).resolve()
         # first, try to delete the directory with all the data
         try:
@@ -239,7 +275,7 @@ class Swarm:
                 with open(self.output_file, "w") as f:
                     f.write(message)
                     f.close()
-                
+
                 # try to write it to json. can somtimes be malformated
                 out_json = str(self.output_file).replace(".txt", ".json")
                 message_dict = json.loads(message)
@@ -263,7 +299,7 @@ class Swarm:
                     f.close()
 
                 return message
-                
+
             elif method == "read":
                 # reading the report file
                 with open(self.output_file, "r") as f:
@@ -273,7 +309,6 @@ class Swarm:
 
             else:
                 raise ValueError(f"Unknown method {method}")
-
 
     def log(self, message, level="info"):
         level = level.lower()
@@ -289,5 +324,4 @@ class Swarm:
             level = 50
         else:
             level = 0
-        self.logger.log(level=level, msg= {'message': message})
-
+        self.logger.log(level=level, msg={'message': message})
