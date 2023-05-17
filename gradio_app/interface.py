@@ -8,7 +8,7 @@ import time
 
 root_dir = Path(__file__).parent.parent
 sys.path.append(str(root_dir))
-from gradio_app.interacton_with_swarm import *
+from interacton_with_swarm import *
 
 SWARM_IS_RUNNING = False
 
@@ -42,19 +42,9 @@ def swarm_interface(swarm_role, swarm_global_goal, swarm_goals, n_managers, n_an
     SWARM_IS_RUNNING = True
 
 def create_gradio_interface():
-    title = """
-    <h1 align="center">🐝🐝 Swarm Intelligence 🐝🐝</h1>
-    <div align="center">
-    <a style="display:inline-block" href='https://github.com/nicelir1996/GPT-Swarm'><img src='https://img.shields.io/github/stars/nicelir1996/GPT-Swarm?style=social' /></a>
-    <a href="https://huggingface.co/spaces/swarm-agents/swarm-agents?duplicate=true"><img src="https://bit.ly/3gLdBN6" alt="Duplicate Space"></a>
-    </div>
-    """
+    title = "title"
 
-    #display message for themes feature
-    theme_addon_msg = """
-    The swarm of agents combines a huge number of parallel agents divided into roles, including (for now) managers, analytics, and googlers. 
-    The agents all interact with each other through the shared memory and the task queue.
-    """
+    
 
     #Modifying existing Gradio Theme
     theme = gr.themes.Soft(primary_hue="zinc", secondary_hue="green", neutral_hue="green",
@@ -62,8 +52,6 @@ def create_gradio_interface():
     
     with gr.Blocks() as demo:
         # Create a container on the left for the inputs
-        gr.HTML(title)
-        gr.HTML(theme_addon_msg)
 
         # layout
         with gr.Row():
